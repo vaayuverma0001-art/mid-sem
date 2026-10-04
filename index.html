@@ -1,0 +1,1071 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>VoltEdge — Smart Electricity Monitoring</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<script>
+tailwind.config = {
+  theme: {
+    extend: {
+      fontFamily: { grotesk:['Space Grotesk','sans-serif'], inter:['Inter','sans-serif'], mono:['JetBrains Mono','monospace'] },
+      colors: {
+        volt:{950:'#04070f',900:'#070c18',800:'#0b1326',700:'#111c36',600:'#1a2a52'},
+        neon:{DEFAULT:'#22f0c8',dim:'#0fb894',glow:'#6ffbe0'},
+        amberx:'#ffb547', cyanx:'#38e1ff', viol:'#8b7cff'
+      },
+      boxShadow:{ glow:'0 0 40px rgba(34,240,200,.25)', card:'0 20px 60px rgba(0,0,0,.5)', neonb:'0 0 0 1px rgba(34,240,200,.35), 0 0 24px rgba(34,240,200,.15) inset' }
+    }
+  }
+}
+</script>
+<style>
+*{scrollbar-width:thin; scrollbar-color:#22f0c8 #0b1326}
+*::-webkit-scrollbar{width:8px;height:8px}
+*::-webkit-scrollbar-track{background:#0b1326}
+*::-webkit-scrollbar-thumb{background:linear-gradient(#22f0c8,#38e1ff);border-radius:99px}
+html{scroll-behavior:smooth}
+body{background:#04070f;color:#e8f1ff;font-family:Inter,sans-serif;overflow-x:hidden}
+.grotesk{font-family:'Space Grotesk',sans-serif}
+.grid-bg{position:fixed;inset:0;z-index:0;pointer-events:none;
+background-image:linear-gradient(rgba(56,225,255,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(56,225,255,.06) 1px,transparent 1px);
+background-size:44px 44px;mask-image:radial-gradient(ellipse 90% 70% at 50% 0%,black 40%,transparent 100%)}
+.orb{position:fixed;border-radius:50%;filter:blur(90px);opacity:.45;z-index:0;pointer-events:none;animation:float 12s ease-in-out infinite alternate}
+@keyframes float{from{transform:translateY(-20px) scale(1)}to{transform:translateY(30px) scale(1.15)}}
+.glass{background:linear-gradient(180deg,rgba(17,28,54,.85),rgba(11,19,38,.9));backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.08)}
+.glass-2{background:rgba(255,255,255,.04);backdrop-filter:blur(14px);border:1px solid rgba(255,255,255,.09)}
+.neon-border{position:relative}
+.neon-border::before{content:'';position:absolute;inset:0;border-radius:inherit;padding:1px;background:linear-gradient(135deg,rgba(34,240,200,.6),rgba(56,225,255,.15),rgba(139,124,255,.5),rgba(255,181,71,.4));-webkit-mask:linear-gradient(#fff 0 0) content-box,linear-gradient(#fff 0 0);-webkit-mask-composite:xor;mask-composite:exclude;pointer-events:none}
+.btn-neon{background:linear-gradient(135deg,#22f0c8,#38e1ff);color:#04120d;font-weight:800;transition:.3s;box-shadow:0 8px 30px rgba(34,240,200,.35)}
+.btn-neon:hover{transform:translateY(-2px);box-shadow:0 14px 40px rgba(34,240,200,.5)}
+.btn-ghost{border:1px solid rgba(255,255,255,.15);transition:.25s}
+.btn-ghost:hover{border-color:#22f0c8;background:rgba(34,240,200,.08)}
+.otp-box{width:52px;height:62px;text-align:center;font-size:24px;font-weight:800;font-family:'JetBrains Mono';background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);border-radius:14px;color:#fff;outline:none;transition:.2s}
+.otp-box:focus{border-color:#22f0c8;box-shadow:0 0 0 4px rgba(34,240,200,.18);background:rgba(34,240,200,.08)}
+.otp-box.filled{border-color:#22f0c8;background:rgba(34,240,200,.1)}
+.chip{font-size:11px;letter-spacing:.12em;text-transform:uppercase;font-weight:700;padding:6px 12px;border-radius:999px}
+.pulse-dot{position:relative}
+.pulse-dot::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:2px solid currentColor;opacity:.6;animation:ping 1.6s cubic-bezier(0,0,.2,1) infinite}
+@keyframes ping{75%,100%{transform:scale(1.8);opacity:0}}
+.live-line{stroke-dasharray:6 6;animation:dash 1s linear infinite}
+@keyframes dash{to{stroke-dashoffset:-12}}
+.card-hover{transition:.35s cubic-bezier(.2,.8,.2,1)}
+.card-hover:hover{transform:translateY(-4px);border-color:rgba(34,240,200,.4);box-shadow:0 20px 50px rgba(0,0,0,.5),0 0 30px rgba(34,240,200,.12)}
+.toggle{width:48px;height:26px;border-radius:99px;background:rgba(255,255,255,.12);position:relative;cursor:pointer;transition:.3s;flex-shrink:0}
+.toggle::after{content:'';position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#8a9bb5;transition:.3s}
+.toggle.on{background:linear-gradient(90deg,#22f0c8,#38e1ff)}
+.toggle.on::after{left:25px;background:#04120d}
+.day-dot{width:38px;height:38px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);transition:.4s}
+.day-dot.done{background:linear-gradient(135deg,#22f0c8,#38e1ff);color:#04120d;border-color:transparent;box-shadow:0 0 18px rgba(34,240,200,.5)}
+.day-dot.current{border-color:#ffb547;color:#ffb547;box-shadow:0 0 18px rgba(255,181,71,.35);animation:blink 1.2s infinite}
+@keyframes blink{50%{background:rgba(255,181,71,.15)}}
+.season-card{transition:.35s}
+.season-card.active{border-color:#22f0c8!important;background:linear-gradient(180deg,rgba(34,240,200,.14),rgba(34,240,200,.03))!important;box-shadow:0 0 30px rgba(34,240,200,.2)}
+.toast-push{animation:slideIn .5s cubic-bezier(.2,.9,.3,1.2)}
+@keyframes slideIn{from{transform:translateX(120%);opacity:0}to{transform:translateX(0);opacity:1}}
+.shimmer{position:relative;overflow:hidden}
+.shimmer::after{content:'';position:absolute;inset:0;background:linear-gradient(110deg,transparent 30%,rgba(255,255,255,.12) 50%,transparent 70%);animation:shim 2.2s infinite}
+@keyframes shim{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+.modal-bg{background:rgba(2,5,12,.78);backdrop-filter:blur(10px)}
+.card-3d{transform-style:preserve-3d;transition:.2s}
+.process-bar{height:8px;border-radius:99px;background:rgba(255,255,255,.1);overflow:hidden}
+.process-bar>div{height:100%;border-radius:99px;background:linear-gradient(90deg,#22f0c8,#38e1ff,#8b7cff);transition:width .3s}
+.tick{font-family:'JetBrains Mono';font-variant-numeric:tabular-nums}
+.nav-item{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:14px;color:#9fb0c9;font-weight:600;font-size:14px;cursor:pointer;transition:.25s;border:1px solid transparent}
+.nav-item:hover{color:#fff;background:rgba(255,255,255,.05)}
+.nav-item.active{color:#04120d;background:linear-gradient(135deg,#22f0c8,#38e1ff);box-shadow:0 8px 24px rgba(34,240,200,.3)}
+.sms-bubble{max-width:85%;padding:10px 14px;border-radius:16px;font-size:13px;line-height:1.5}
+.alert-row{transition:.3s}
+.alert-row:hover{background:rgba(255,255,255,.04)}
+input,select{color-scheme:dark}
+.field{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:12px 14px;width:100%;outline:none;transition:.2s;color:#fff;font-size:14px}
+.field:focus{border-color:#22f0c8;box-shadow:0 0 0 4px rgba(34,240,200,.15);background:rgba(34,240,200,.05)}
+.field::placeholder{color:#5a6d8a}
+table{width:100%}
+.confetti{position:fixed;pointer-events:none;z-index:200}
+.marquee{display:flex;gap:12px;animation:marq 22s linear infinite}
+@keyframes marq{to{transform:translateX(-50%)}}
+.gauge-needle{transition:transform 1s cubic-bezier(.2,.8,.2,1);transform-origin:bottom center}
+#preloader{transition:opacity .6s}
+.spin-ring{width:74px;height:74px;border-radius:50%;border:3px solid rgba(34,240,200,.15);border-top-color:#22f0c8;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.kpi-num{font-variant-numeric:tabular-nums}
+@media(max-width:640px){.otp-box{width:44px;height:54px;font-size:20px}}
+</style>
+</head>
+<body class="antialiased">
+<div class="grid-bg"></div>
+<div class="orb" style="width:520px;height:520px;background:#0ea5a0;top:-160px;left:-120px"></div>
+<div class="orb" style="width:460px;height:460px;background:#4c3ce0;top:20%;right:-160px;animation-delay:2s"></div>
+<div class="orb" style="width:380px;height:380px;background:#ff9a3d;bottom:-120px;left:30%;opacity:.22;animation-delay:4s"></div>
+
+<!-- PRELOADER -->
+<div id="preloader" class="fixed inset-0 z-[300] bg-[#04070f] flex flex-col items-center justify-center gap-6">
+  <div class="flex items-center gap-3">
+    <div class="w-12 h-12 rounded-2xl flex items-center justify-center" style="background:linear-gradient(135deg,#22f0c8,#38e1ff);box-shadow:0 0 40px rgba(34,240,200,.5)">
+      <i class="fa-solid fa-bolt text-[#04120d] text-2xl"></i>
+    </div>
+    <div><div class="grotesk font-bold text-2xl tracking-tight">VoltEdge</div><div class="text-[11px] tracking-[.3em] text-neon font-bold">SMART GRID OS</div></div>
+  </div>
+  <div class="spin-ring"></div>
+  <div class="text-sm text-slate-400 tick" id="bootText">Initializing secure grid…</div>
+</div>
+
+<!-- ============ LOGIN VIEW ============ -->
+<div id="loginView" class="relative z-10 min-h-screen hidden">
+  <div class="min-h-screen grid lg:grid-cols-2">
+    <!-- Left brand -->
+    <div class="relative hidden lg:flex flex-col justify-between p-12 overflow-hidden" style="background:linear-gradient(180deg,rgba(7,12,24,.4),rgba(4,7,15,.9)), url('https://images.unsplash.com/photo-1466611653911-95081537e5b7?q=80&w=1600&auto=format&fit=crop') center/cover">
+      <div class="absolute inset-0" style="background:linear-gradient(180deg,rgba(4,7,15,.55),rgba(4,7,15,.88))"></div>
+      <div class="relative flex items-center gap-3">
+        <div class="w-11 h-11 rounded-2xl flex items-center justify-center" style="background:linear-gradient(135deg,#22f0c8,#38e1ff)"><i class="fa-solid fa-bolt text-[#04120d] text-xl"></i></div>
+        <div><div class="grotesk font-bold text-xl">VoltEdge</div><div class="text-[10px] tracking-[.3em] text-neon font-bold">SMART ENERGY OS</div></div>
+        <span class="ml-3 chip" style="background:rgba(34,240,200,.15);color:#6ffbe0;border:1px solid rgba(34,240,200,.3)">v3.2 LIVE</span>
+      </div>
+      <div class="relative">
+        <div class="chip inline-flex items-center gap-2 mb-5" style="background:rgba(255,181,71,.12);color:#ffb547;border:1px solid rgba(255,181,71,.3)"><span class="w-2 h-2 rounded-full bg-[#ffb547] pulse-dot"></span> 2,48,312 HOMES OPTIMIZED TODAY</div>
+        <h1 class="grotesk font-bold leading-[.95] tracking-tight" style="font-size:56px">Know every watt.<br><span style="background:linear-gradient(90deg,#22f0c8,#38e1ff,#8b7cff);-webkit-background-clip:text;background-clip:text;color:transparent">Control every rupee.</span></h1>
+        <p class="mt-5 text-slate-300 max-w-md leading-relaxed">Smart meter intelligence with 10-day AI learning, seasonal recalibration & instant high-usage alerts via SMS, Push & Email.</p>
+        <div class="grid grid-cols-3 gap-4 mt-8 max-w-lg">
+          <div class="glass rounded-2xl p-4"><div class="grotesk font-bold text-2xl text-neon tick" id="heroKwh">—</div><div class="text-xs text-slate-400 mt-1">Avg. saved / home</div></div>
+          <div class="glass rounded-2xl p-4"><div class="grotesk font-bold text-2xl text-cyanx tick">98.2%</div><div class="text-xs text-slate-400 mt-1">Detection accuracy</div></div>
+          <div class="glass rounded-2xl p-4"><div class="grotesk font-bold text-2xl text-amberx tick">&lt;3s</div><div class="text-xs text-slate-400 mt-1">Alert latency</div></div>
+        </div>
+        <div class="mt-8 flex items-center gap-4 text-xs text-slate-400">
+          <span><i class="fa-solid fa-shield-halved text-neon mr-1"></i> 256-bit encrypted</span>
+          <span><i class="fa-solid fa-plug-circle-bolt text-neon mr-1"></i> 40+ meter models</span>
+          <span><i class="fa-solid fa-leaf text-neon mr-1"></i> BIS • CEA certified</span>
+        </div>
+      </div>
+      <div class="relative overflow-hidden rounded-2xl glass p-4">
+        <div class="text-[11px] tracking-[.2em] font-bold text-slate-400 mb-2">LIVE GRID ACTIVITY</div>
+        <div class="overflow-hidden"><div class="marquee whitespace-nowrap text-xs tick" id="marquee"></div></div>
+      </div>
+    </div>
+
+    <!-- Right login -->
+    <div class="flex items-center justify-center p-6 sm:p-12">
+      <div class="w-full max-w-[480px]">
+        <div class="lg:hidden flex items-center gap-3 mb-8">
+          <div class="w-11 h-11 rounded-2xl flex items-center justify-center" style="background:linear-gradient(135deg,#22f0c8,#38e1ff)"><i class="fa-solid fa-bolt text-[#04120d]"></i></div>
+          <div><div class="grotesk font-bold text-xl">VoltEdge</div><div class="text-[10px] tracking-[.3em] text-neon font-bold">SMART ENERGY OS</div></div>
+        </div>
+
+        <div class="glass neon-border rounded-[24px] p-8 sm:p-10 shadow-card relative">
+          <div class="flex items-center justify-between mb-6">
+            <span class="chip" style="background:rgba(34,240,200,.12);color:#6ffbe0;border:1px solid rgba(34,240,200,.3)"><i class="fa-solid fa-lock mr-1"></i> SECURE LOGIN</span>
+            <span class="text-xs text-slate-400 tick">Step <span id="stepNum" class="text-neon font-bold">1</span>/2</span>
+          </div>
+
+          <!-- STEP PHONE -->
+          <div id="stepPhone">
+            <h2 class="grotesk font-bold text-3xl tracking-tight">Welcome back<span class="text-neon">.</span></h2>
+            <p class="text-sm text-slate-400 mt-2">Login with your phone number. We'll send a <b class="text-white">6-digit OTP</b> for verification.</p>
+            <label class="text-xs font-bold tracking-widest text-slate-400 mt-7 block mb-2">PHONE NUMBER</label>
+            <div class="flex gap-3">
+              <div class="field !w-[92px] flex items-center justify-center font-bold tick">🇮🇳 +91</div>
+              <input id="phoneInput" maxlength="10" inputmode="numeric" placeholder="98765 43210" class="field tick font-bold tracking-widest text-lg" oninput="this.value=this.value.replace(/\D/g,'').slice(0,10);document.getElementById('phoneErr').classList.add('hidden')"/>
+            </div>
+            <div id="phoneErr" class="hidden text-xs text-red-400 mt-2"><i class="fa-solid fa-circle-exclamation mr-1"></i> Enter a valid 10-digit mobile number.</div>
+            <div class="flex items-start gap-3 mt-5 text-xs text-slate-400 leading-relaxed">
+              <div class="toggle on" id="consentToggle" onclick="this.classList.toggle('on')"></div>
+              <span>I agree to receive energy alerts via <b class="text-white">SMS, Push & Email</b> and accept the Terms & Privacy Policy.</span>
+            </div>
+            <button onclick="sendOTP()" id="sendOtpBtn" class="btn-neon w-full rounded-2xl py-4 mt-6 grotesk font-bold tracking-wide">SEND OTP <i class="fa-solid fa-paper-plane ml-2"></i></button>
+            <div class="mt-5 rounded-2xl p-4 text-xs leading-relaxed" style="background:rgba(56,225,255,.07);border:1px solid rgba(56,225,255,.2)">
+              <div class="font-bold text-cyanx mb-1"><i class="fa-solid fa-flask mr-1"></i> DEMO MODE</div>
+              Use any 10-digit number. The OTP will appear as a toast + demo card — no real SMS needed.
+            </div>
+          </div>
+
+          <!-- STEP OTP -->
+          <div id="stepOtp" class="hidden">
+            <button onclick="backToPhone()" class="text-xs text-slate-400 hover:text-white mb-4"><i class="fa-solid fa-arrow-left mr-1"></i> Change number</button>
+            <h2 class="grotesk font-bold text-3xl tracking-tight">Enter OTP</h2>
+            <p class="text-sm text-slate-400 mt-2">Sent to <b id="maskedPhone" class="text-white tick">+91 •••••</b> via SMS <span class="chip ml-1" style="background:rgba(34,240,200,.12);color:#6ffbe0">6-DIGIT</span></p>
+            <div class="flex gap-2 justify-between mt-7" id="otpRow">
+              <input class="otp-box" maxlength="1" inputmode="numeric"/><input class="otp-box" maxlength="1" inputmode="numeric"/><input class="otp-box" maxlength="1" inputmode="numeric"/><input class="otp-box" maxlength="1" inputmode="numeric"/><input class="otp-box" maxlength="1" inputmode="numeric"/><input class="otp-box" maxlength="1" inputmode="numeric"/>
+            </div>
+            <div id="otpErr" class="hidden text-xs text-red-400 mt-3"><i class="fa-solid fa-circle-exclamation mr-1"></i> Incorrect OTP. Please try again.</div>
+            <div class="flex items-center justify-between mt-5 text-sm">
+              <span class="text-slate-400 text-xs">Didn't receive? <button id="resendBtn" onclick="resendOTP()" disabled class="font-bold text-slate-600">Resend in <span id="resendT" class="tick">30</span>s</button></span>
+              <button onclick="autofillOTP()" class="text-xs font-bold text-neon hover:underline"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i>Autofill demo OTP</button>
+            </div>
+            <button onclick="verifyOTP()" id="verifyBtn" class="btn-neon w-full rounded-2xl py-4 mt-5 grotesk font-bold">VERIFY & LOGIN <i class="fa-solid fa-right-to-bracket ml-2"></i></button>
+            <div id="demoOtpCard" class="hidden mt-4 rounded-2xl p-4 flex items-center justify-between" style="background:rgba(255,181,71,.08);border:1px dashed rgba(255,181,71,.5)">
+              <div><div class="text-[10px] tracking-[.2em] font-bold text-amberx">DEMO OTP (SIMULATED SMS)</div><div id="demoOtpVal" class="tick font-bold text-2xl tracking-[.3em] text-white">------</div></div>
+              <button onclick="autofillOTP()" class="btn-ghost rounded-xl px-4 py-2 text-xs font-bold">Autofill</button>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-3 mt-7 text-[11px] text-slate-500">
+            <div class="h-px flex-1 bg-white/10"></div> PROTECTED BY VOLTEDGE AUTH <div class="h-px flex-1 bg-white/10"></div>
+          </div>
+          <div class="flex justify-center gap-5 mt-4 text-slate-500 text-lg"><i class="fa-brands fa-google hover:text-white cursor-pointer"></i><i class="fa-brands fa-apple hover:text-white cursor-pointer"></i><i class="fa-solid fa-fingerprint hover:text-neon cursor-pointer"></i></div>
+        </div>
+        <p class="text-center text-xs text-slate-500 mt-5">UI consistency preserved • Same design system across login, dashboard & payments</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ APP VIEW ============ -->
+<div id="appView" class="relative z-10 hidden">
+  <div class="flex min-h-screen">
+    <!-- SIDEBAR -->
+    <aside class="hidden lg:flex flex-col w-[264px] shrink-0 p-5 gap-2 sticky top-0 h-screen overflow-y-auto" style="background:rgba(7,12,24,.85);border-right:1px solid rgba(255,255,255,.07);backdrop-filter:blur(18px)">
+      <div class="flex items-center gap-3 px-2 py-3">
+        <div class="w-10 h-10 rounded-xl flex items-center justify-center" style="background:linear-gradient(135deg,#22f0c8,#38e1ff)"><i class="fa-solid fa-bolt text-[#04120d]"></i></div>
+        <div><div class="grotesk font-bold leading-none">VoltEdge</div><div class="text-[9px] tracking-[.3em] text-neon font-bold mt-1">SMART GRID OS</div></div>
+      </div>
+      <div class="rounded-2xl p-4 mt-2" style="background:linear-gradient(135deg,rgba(34,240,200,.15),rgba(56,225,255,.06));border:1px solid rgba(34,240,200,.25)">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-full flex items-center justify-center font-bold grotesk" style="background:linear-gradient(135deg,#ffb547,#ff6b6b)" id="avatarInit">U</div>
+          <div class="min-w-0"><div class="text-sm font-bold truncate" id="sidePhone">+91 •••••</div><div class="text-[11px] text-neon font-bold flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-neon inline-block"></span> VERIFIED USER</div></div>
+        </div>
+      </div>
+      <div class="text-[10px] tracking-[.25em] font-bold text-slate-500 px-3 mt-4 mb-1">MONITOR</div>
+      <div class="nav-item active" data-nav="dashboard" onclick="navTo('dashboard',this)"><i class="fa-solid fa-gauge-high w-5"></i> Dashboard</div>
+      <div class="nav-item" data-nav="learning" onclick="navTo('learning',this)"><i class="fa-solid fa-brain w-5"></i> Learning Phase <span id="navLearnBadge" class="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:rgba(255,181,71,.2);color:#ffb547">DAY 0/10</span></div>
+      <div class="nav-item" data-nav="alerts" onclick="navTo('alerts',this)"><i class="fa-solid fa-bell w-5"></i> Alerts <span id="navAlertCount" class="ml-auto text-[10px] font-bold px-2 py-0.5 rounded-full bg-red-500/20 text-red-300">0</span></div>
+      <div class="nav-item" data-nav="notifications" onclick="navTo('notifications',this)"><i class="fa-solid fa-message w-5"></i> Notifications</div>
+      <div class="text-[10px] tracking-[.25em] font-bold text-slate-500 px-3 mt-3 mb-1">MANAGE</div>
+      <div class="nav-item" data-nav="meters" onclick="openMeterModal()"><i class="fa-solid fa-plug-circle-bolt w-5"></i> Smart Meter <span id="meterDot" class="ml-auto w-2 h-2 rounded-full bg-red-400"></span></div>
+      <div class="nav-item" data-nav="billing" onclick="navTo('billing',this)"><i class="fa-solid fa-credit-card w-5"></i> Billing & Plans</div>
+      <div class="nav-item" onclick="openPayment()"><i class="fa-solid fa-crown w-5 text-amberx"></i> <span class="text-amberx">Go Premium</span></div>
+      <div class="mt-auto">
+        <div class="rounded-2xl p-4 glass-2">
+          <div class="text-xs font-bold mb-1">Seasonal AI active</div>
+          <div class="text-[11px] text-slate-400 leading-relaxed">Auto 10-day recalibration every season.</div>
+          <div class="toggle on mt-3" id="autoSeasonToggleSide" onclick="toggleAutoSeason(this)"></div>
+        </div>
+        <button onclick="logout()" class="nav-item w-full mt-2 !text-red-300"><i class="fa-solid fa-right-from-bracket w-5"></i> Logout</button>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="flex-1 min-w-0">
+      <!-- TOPBAR -->
+      <header class="sticky top-0 z-40 px-4 sm:px-8 py-4" style="background:rgba(4,7,15,.8);backdrop-filter:blur(18px);border-bottom:1px solid rgba(255,255,255,.07)">
+        <div class="flex items-center gap-3 flex-wrap">
+          <div class="lg:hidden w-9 h-9 rounded-xl flex items-center justify-center" style="background:linear-gradient(135deg,#22f0c8,#38e1ff)"><i class="fa-solid fa-bolt text-[#04120d] text-sm"></i></div>
+          <div>
+            <div class="grotesk font-bold text-lg leading-none">Namaste, <span id="topPhone" class="text-neon">User</span> 👋</div>
+            <div class="text-[11px] text-slate-400 mt-1 flex items-center gap-2 flex-wrap"><span id="dateLine">—</span> • <span id="seasonPill" class="chip !py-1 !px-2.5" style="background:rgba(139,124,255,.15);color:#b7adff;border:1px solid rgba(139,124,255,.3)">🍂 AUTUMN</span></div>
+          </div>
+          <div class="ml-auto flex items-center gap-2 flex-wrap">
+            <span id="learnBadgeTop" class="chip" style="background:rgba(255,181,71,.12);color:#ffb547;border:1px solid rgba(255,181,71,.35)"><i class="fa-solid fa-brain mr-1"></i> LEARNING • DAY 0/10</span>
+            <span id="connPill" class="chip" style="background:rgba(255,100,100,.12);color:#ff9a9a;border:1px solid rgba(255,100,100,.3)"><span class="w-2 h-2 rounded-full bg-red-400 inline-block mr-1"></span> METER OFFLINE</span>
+            <button onclick="openMeterModal()" class="btn-ghost rounded-xl px-4 py-2.5 text-xs font-bold hidden sm:block"><i class="fa-solid fa-plug mr-1 text-neon"></i> Meter</button>
+            <button onclick="openPayment()" class="btn-neon rounded-xl px-5 py-2.5 text-xs grotesk"><i class="fa-solid fa-crown mr-1"></i> UPGRADE</button>
+            <button onclick="logout()" class="btn-ghost rounded-xl px-3 py-2.5 text-xs lg:hidden"><i class="fa-solid fa-right-from-bracket"></i></button>
+          </div>
+        </div>
+      </header>
+
+      <div class="px-4 sm:px-8 py-6 max-w-[1280px] mx-auto space-y-6 pb-28 lg:pb-10">
+        <!-- BANNERS -->
+        <div id="learnBanner" class="rounded-2xl p-5 flex flex-col md:flex-row gap-4 items-start md:items-center neon-border glass">
+          <div class="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0" style="background:linear-gradient(135deg,#ffb547,#ff6b6b)"><i class="fa-solid fa-brain text-white text-xl"></i></div>
+          <div class="flex-1">
+            <div class="grotesk font-bold">10-Day Learning Phase in progress — alerts muted 🔕</div>
+            <div class="text-sm text-slate-400 mt-1">We're establishing your average consumption baseline. No high-usage alerts will be sent until <b class="text-white" id="learnEndDate">—</b>. You can fast-forward for demo.</div>
+            <div class="process-bar mt-3"><div id="learnBarTop" style="width:0%"></div></div>
+          </div>
+          <div class="flex gap-2 shrink-0">
+            <button onclick="simulateDay()" class="btn-neon rounded-xl px-4 py-2.5 text-xs font-bold">+ SIMULATE DAY</button>
+            <button onclick="navTo('learning',document.querySelector('[data-nav=learning]'))" class="btn-ghost rounded-xl px-4 py-2.5 text-xs font-bold">DETAILS</button>
+          </div>
+        </div>
+        <div id="highBanner" class="hidden rounded-2xl p-5 flex-col md:flex-row gap-4 items-start md:items-center" style="background:linear-gradient(135deg,rgba(255,80,80,.18),rgba(255,150,50,.1));border:1px solid rgba(255,100,100,.4)">
+          <div class="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 animate-bounce" style="background:linear-gradient(135deg,#ff5050,#ff9a3d)"><i class="fa-solid fa-triangle-exclamation text-white text-xl"></i></div>
+          <div class="flex-1"><div class="grotesk font-bold text-red-200">⚡ High usage detected!</div><div class="text-sm text-red-200/70 mt-1" id="highBannerText">Consumption exceeds your average.</div></div>
+          <button onclick="navTo('alerts',document.querySelector('[data-nav=alerts]'))" class="rounded-xl px-4 py-2.5 text-xs font-bold bg-red-500 text-white">VIEW ALERT</button>
+        </div>
+
+        <!-- KPI -->
+        <section id="sec-dashboard">
+          <div class="grid grid-cols-2 xl:grid-cols-5 gap-4">
+            <div class="glass rounded-2xl p-5 card-hover neon-border">
+              <div class="flex items-center justify-between"><span class="text-[10px] tracking-[.2em] font-bold text-slate-400">LIVE POWER</span><span class="w-2 h-2 rounded-full bg-neon pulse-dot text-neon"></span></div>
+              <div class="grotesk font-bold text-4xl mt-2 kpi-num"><span id="kpiKw" class="tick">0.00</span><span class="text-sm text-slate-400 font-inter font-medium"> kW</span></div>
+              <div class="text-xs mt-1" id="kpiKwSub" style="color:#6ffbe0">● Normal draw</div>
+              <div class="mt-3 h-1.5 rounded-full bg-white/10 overflow-hidden"><div id="kwMiniBar" class="h-full rounded-full" style="width:20%;background:linear-gradient(90deg,#22f0c8,#38e1ff);transition:width .6s"></div></div>
+            </div>
+            <div class="glass rounded-2xl p-5 card-hover">
+              <div class="text-[10px] tracking-[.2em] font-bold text-slate-400">TODAY'S ENERGY</div>
+              <div class="grotesk font-bold text-4xl mt-2 kpi-num"><span id="kpiToday" class="tick">0.0</span><span class="text-sm text-slate-400 font-inter font-medium"> kWh</span></div>
+              <div class="text-xs text-slate-400 mt-1">₹<span id="kpiCost" class="tick">0</span> estimated • <span class="text-neon">▼ 12% vs yesterday</span></div>
+            </div>
+            <div class="glass rounded-2xl p-5 card-hover">
+              <div class="text-[10px] tracking-[.2em] font-bold text-slate-400">10-DAY AVERAGE BASELINE</div>
+              <div class="grotesk font-bold text-4xl mt-2 kpi-num"><span id="kpiAvg" class="tick">—</span><span class="text-sm text-slate-400 font-inter font-medium"> kWh/day</span></div>
+              <div class="text-xs text-slate-400 mt-1" id="kpiAvgSub">Learning… day 0/10</div>
+            </div>
+            <div class="glass rounded-2xl p-5 card-hover">
+              <div class="text-[10px] tracking-[.2em] font-bold text-slate-400">MONTHLY BILL EST.</div>
+              <div class="grotesk font-bold text-4xl mt-2 kpi-num">₹<span id="kpiBill" class="tick">0</span></div>
+              <div class="text-xs mt-1 text-amberx" id="kpiBillSub">Within Smart Plus quota</div>
+            </div>
+            <div class="glass rounded-2xl p-5 card-hover col-span-2 xl:col-span-1" style="background:linear-gradient(135deg,rgba(34,240,200,.12),rgba(139,124,255,.1))">
+              <div class="text-[10px] tracking-[.2em] font-bold text-slate-300">CARBON SAVED</div>
+              <div class="grotesk font-bold text-4xl mt-2 kpi-num"><span id="kpiCo2" class="tick">0</span><span class="text-sm font-inter font-medium text-slate-300"> kg</span></div>
+              <div class="text-xs text-slate-300 mt-1">🌱 = <span id="kpiTrees">0</span> trees planted</div>
+            </div>
+          </div>
+
+          <!-- LIVE + SIDE -->
+          <div class="grid lg:grid-cols-3 gap-4 mt-4">
+            <div class="glass rounded-2xl p-6 lg:col-span-2 neon-border">
+              <div class="flex items-center gap-3 flex-wrap">
+                <div><div class="grotesk font-bold text-lg">Live Consumption</div><div class="text-xs text-slate-400">Smart meter feed • updates every 2s • <span class="tick" id="meterIdLabel">No meter</span></div></div>
+                <div class="ml-auto flex gap-2">
+                  <button onclick="toggleLive()" id="liveBtn" class="btn-ghost rounded-xl px-4 py-2 text-xs font-bold"><i class="fa-solid fa-pause mr-1"></i>PAUSE</button>
+                  <button onclick="spikeUsage()" class="rounded-xl px-4 py-2 text-xs font-bold" style="background:rgba(255,100,100,.15);border:1px solid rgba(255,100,100,.4);color:#ff9a9a"><i class="fa-solid fa-bolt mr-1"></i>TEST SPIKE</button>
+                  <button onclick="exportCSV()" class="btn-ghost rounded-xl px-4 py-2 text-xs font-bold"><i class="fa-solid fa-download mr-1"></i>CSV</button>
+                </div>
+              </div>
+              <div class="h-[280px] mt-4"><canvas id="liveChart"></canvas></div>
+              <div class="grid grid-cols-3 gap-3 mt-4 text-center">
+                <div class="rounded-xl p-3 glass-2"><div class="text-[10px] font-bold tracking-widest text-slate-400">VOLTAGE</div><div class="grotesk font-bold tick" id="voltV">231.4 V</div></div>
+                <div class="rounded-xl p-3 glass-2"><div class="text-[10px] font-bold tracking-widest text-slate-400">CURRENT</div><div class="grotesk font-bold tick" id="ampV">8.2 A</div></div>
+                <div class="rounded-xl p-3 glass-2"><div class="text-[10px] font-bold tracking-widest text-slate-400">FREQUENCY</div><div class="grotesk font-bold tick">50.02 Hz</div></div>
+              </div>
+            </div>
+            <div class="space-y-4">
+              <div class="glass rounded-2xl p-6">
+                <div class="grotesk font-bold">Baseline vs Now</div>
+                <div class="text-xs text-slate-400 mt-1">High-usage detection engine</div>
+                <div class="flex justify-center my-4">
+                  <div class="relative" style="width:180px;height:100px">
+                    <svg viewBox="0 0 180 100" class="w-full">
+                      <path d="M10 90 A80 80 0 0 1 170 90" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="14" stroke-linecap="round"/>
+                      <path id="gaugeArc" d="M10 90 A80 80 0 0 1 170 90" fill="none" stroke="url(#gg)" stroke-width="14" stroke-linecap="round" stroke-dasharray="252" stroke-dashoffset="200"/>
+                      <defs><linearGradient id="gg" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#22f0c8"/><stop offset=".6" stop-color="#ffb547"/><stop offset="1" stop-color="#ff5050"/></linearGradient></defs>
+                    </svg>
+                    <div class="absolute inset-x-0 bottom-0 text-center"><div class="grotesk font-bold text-3xl tick" id="gaugePct">0%</div><div class="text-[10px] tracking-widest font-bold text-slate-400">VS AVERAGE</div></div>
+                    <div id="gaugeNeedle" class="gauge-needle absolute bottom-[6px] left-1/2 w-[3px] h-[74px] rounded-full" style="background:#fff;box-shadow:0 0 12px #fff"></div>
+                  </div>
+                </div>
+                <div class="space-y-2 text-xs">
+                  <div class="flex justify-between rounded-xl px-3 py-2" style="background:rgba(34,240,200,.08);border:1px solid rgba(34,240,200,.2)"><span>✅ Normal (&lt; +<span id="warnLbl">20</span>%)</span><span class="tick" id="normalRange">—</span></div>
+                  <div class="flex justify-between rounded-xl px-3 py-2" style="background:rgba(255,181,71,.08);border:1px solid rgba(255,181,71,.25)"><span>⚠️ Warning (+<span id="warnLbl2">20</span>–<span id="critLbl">40</span>%)</span><span>SMS + Push</span></div>
+                  <div class="flex justify-between rounded-xl px-3 py-2" style="background:rgba(255,80,80,.08);border:1px solid rgba(255,80,80,.3)"><span>🚨 Critical (&gt; +<span id="critLbl2">40</span>%)</span><span>SMS+Push+Email</span></div>
+                </div>
+                <div class="mt-4">
+                  <label class="text-[11px] font-bold tracking-widest text-slate-400">WARNING THRESHOLD: <span id="warnVal" class="text-amberx tick">20%</span></label>
+                  <input type="range" min="5" max="50" value="20" class="w-full accent-emerald-400" oninput="setThresh('warn',this.value)"/>
+                  <label class="text-[11px] font-bold tracking-widest text-slate-400 mt-2 block">CRITICAL THRESHOLD: <span id="critVal" class="text-red-300 tick">40%</span></label>
+                  <input type="range" min="20" max="100" value="40" class="w-full accent-red-400" oninput="setThresh('crit',this.value)"/>
+                </div>
+              </div>
+              <div class="glass rounded-2xl p-5 flex items-center gap-4">
+                <img src="https://images.unsplash.com/photo-1558441337-90a6a2415bcf?q=80&w=200&auto=format&fit=crop" class="w-16 h-16 rounded-2xl object-cover" alt="meter"/>
+                <div class="flex-1"><div class="font-bold text-sm" id="meterName">No meter linked</div><div class="text-xs text-slate-400" id="meterSub">Connect to start 10-day learning</div></div>
+                <button onclick="openMeterModal()" class="btn-neon rounded-xl px-4 py-2 text-xs font-bold">CONNECT</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- LEARNING PHASE CENTER -->
+        <section id="sec-learning" class="glass rounded-3xl p-6 sm:p-8 neon-border">
+          <div class="flex items-start gap-4 flex-wrap">
+            <div class="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0" style="background:linear-gradient(135deg,#8b7cff,#38e1ff)"><i class="fa-solid fa-brain text-white text-xl"></i></div>
+            <div class="flex-1 min-w-[220px]">
+              <div class="grotesk font-bold text-2xl">Learning Phase Center <span class="chip ml-2" style="background:rgba(34,240,200,.12);color:#6ffbe0;border:1px solid rgba(34,240,200,.3)">10-DAY AI BASELINE</span></div>
+              <p class="text-sm text-slate-400 mt-1 max-w-2xl">After connecting the meter, VoltEdge silently observes for <b class="text-white">10 days</b> to learn your average. <b class="text-amberx">No alerts are sent during learning</b> to avoid false alarms. The phase auto-restarts <b class="text-white">every season</b> and anytime you need.</p>
+            </div>
+            <div class="flex gap-2">
+              <button onclick="restartLearning('Manual recalibration requested')" class="btn-neon rounded-xl px-5 py-3 text-xs font-bold"><i class="fa-solid fa-rotate-right mr-1"></i> RESTART ANYTIME</button>
+            </div>
+          </div>
+
+          <div class="grid lg:grid-cols-3 gap-6 mt-6">
+            <div class="lg:col-span-2 rounded-2xl p-6 glass-2">
+              <div class="flex items-center justify-between flex-wrap gap-2">
+                <div class="font-bold">Progress — <span id="learnSeasonLbl" class="text-neon">Autumn Learning</span></div>
+                <div class="text-xs tick text-slate-400">Day <span id="learnDayLbl" class="text-white font-bold">0</span>/10 • <span id="learnPctLbl">0%</span> • Ends <span id="learnEndDate2">—</span></div>
+              </div>
+              <div class="process-bar mt-3 !h-[10px]"><div id="learnBar" style="width:0%"></div></div>
+              <div class="flex gap-2 mt-5 flex-wrap" id="dayDots"></div>
+              <div class="grid sm:grid-cols-2 gap-3 mt-5">
+                <button onclick="simulateDay()" class="btn-neon rounded-xl py-3 text-xs font-bold"><i class="fa-solid fa-forward mr-1"></i> SIMULATE NEXT DAY</button>
+                <button onclick="fastForward()" class="btn-ghost rounded-xl py-3 text-xs font-bold"><i class="fa-solid fa-bolt mr-1"></i> FAST-FORWARD TO DAY 10</button>
+              </div>
+              <div id="learnDaysGrid" class="grid grid-cols-2 sm:grid-cols-5 gap-2 mt-5"></div>
+              <div class="mt-5 rounded-xl p-4 text-xs leading-relaxed" style="background:rgba(255,181,71,.07);border:1px solid rgba(255,181,71,.25)">
+                <i class="fa-solid fa-bell-slash text-amberx mr-1"></i> <b>Alert policy:</b> <span id="alertPolicyTxt">All high-usage alerts are MUTED until baseline is established. Notifications resume automatically on Day 11.</span>
+              </div>
+            </div>
+            <div class="rounded-2xl p-6 glass-2">
+              <div class="font-bold flex items-center gap-2"><i class="fa-solid fa-leaf text-neon"></i> Seasonal Auto-Recalibration</div>
+              <p class="text-xs text-slate-400 mt-1 leading-relaxed">Meter installed in <b class="text-white" id="installSeason">winter</b>? No problem — a fresh 10-day phase starts automatically each season to adapt to heaters, ACs & daylight changes.</p>
+              <div class="flex items-center justify-between mt-4 rounded-xl px-3 py-2.5" style="background:rgba(34,240,200,.07);border:1px solid rgba(34,240,200,.2)">
+                <span class="text-xs font-bold">Auto seasonal learning</span><div class="toggle on" id="autoSeasonToggle" onclick="toggleAutoSeason(this)"></div>
+              </div>
+              <div class="grid grid-cols-2 gap-2 mt-4" id="seasonGrid"></div>
+              <div class="mt-4 rounded-xl p-3 text-xs" style="background:rgba(139,124,255,.08);border:1px solid rgba(139,124,255,.25)">
+                <div class="font-bold text-[#b7adff] mb-1"><i class="fa-solid fa-calendar-days mr-1"></i> NEXT RECALIBRATION</div>
+                <div class="tick" id="nextSeasonTxt">—</div>
+              </div>
+              <label class="text-[11px] font-bold tracking-widest text-slate-400 mt-4 block mb-2">SIMULATE SEASON CHANGE (DEMO)</label>
+              <select id="seasonSim" onchange="simulateSeason(this.value)" class="field">
+                <option value="">— Test auto-restart —</option>
+                <option value="Winter">❄️ Switch to Winter</option>
+                <option value="Spring">🌸 Switch to Spring</option>
+                <option value="Summer">☀️ Switch to Summer</option>
+                <option value="Autumn">🍂 Switch to Autumn</option>
+              </select>
+            </div>
+          </div>
+        </section>
+
+        <!-- HISTORY -->
+        <section class="grid lg:grid-cols-3 gap-4">
+          <div class="glass rounded-2xl p-6 lg:col-span-2">
+            <div class="flex items-center gap-3 flex-wrap">
+              <div class="grotesk font-bold text-lg">Historical Usage</div>
+              <div class="ml-auto flex gap-2" id="histTabs">
+                <button onclick="setHistRange('14',this)" class="rounded-lg px-3 py-1.5 text-xs font-bold btn-neon">14D</button>
+                <button onclick="setHistRange('30',this)" class="rounded-lg px-3 py-1.5 text-xs font-bold btn-ghost">30D</button>
+                <button onclick="setHistRange('season',this)" class="rounded-lg px-3 py-1.5 text-xs font-bold btn-ghost">SEASON</button>
+              </div>
+            </div>
+            <div class="h-[260px] mt-4"><canvas id="histChart"></canvas></div>
+            <div class="mt-4 grid sm:grid-cols-3 gap-3 text-xs" id="aiInsights"></div>
+          </div>
+          <div class="glass rounded-2xl p-6">
+            <div class="grotesk font-bold text-lg">Appliance Split <span class="text-xs font-inter font-normal text-slate-400">(AI estimate)</span></div>
+            <div class="h-[210px] mt-2"><canvas id="donutChart"></canvas></div>
+            <div class="space-y-2 mt-3 text-xs" id="applianceList"></div>
+          </div>
+        </section>
+
+        <!-- ALERTS + NOTIFICATIONS -->
+        <section id="sec-alerts" class="grid lg:grid-cols-5 gap-4">
+          <div class="glass rounded-2xl p-6 lg:col-span-3">
+            <div class="flex items-center gap-3"><div class="grotesk font-bold text-lg">Unusual Consumption Alerts</div><span id="alertCountPill" class="chip" style="background:rgba(255,80,80,.12);color:#ff9a9a;border:1px solid rgba(255,80,80,.3)">0 TOTAL</span>
+              <button onclick="clearAlerts()" class="ml-auto btn-ghost rounded-xl px-3 py-1.5 text-xs font-bold">Clear</button></div>
+            <div id="alertsList" class="mt-4 space-y-2 max-h-[380px] overflow-y-auto pr-1"></div>
+          </div>
+          <div id="sec-notifications" class="glass rounded-2xl p-6 lg:col-span-2 neon-border">
+            <div class="grotesk font-bold text-lg">Notification Channels</div>
+            <div class="text-xs text-slate-400">High-usage alerts via SMS, Push & optional Email</div>
+            <div class="space-y-3 mt-4">
+              <div class="rounded-2xl p-4 flex items-center gap-3" style="background:rgba(34,240,200,.06);border:1px solid rgba(34,240,200,.2)">
+                <div class="w-10 h-10 rounded-xl flex items-center justify-center bg-emerald-400/20"><i class="fa-solid fa-message text-neon"></i></div>
+                <div class="flex-1"><div class="font-bold text-sm">SMS Alerts <span class="chip ml-1 !text-[9px]" style="background:rgba(34,240,200,.15);color:#6ffbe0">RECOMMENDED</span></div><div class="text-[11px] text-slate-400 tick" id="smsTo">to +91 •••••</div></div>
+                <div class="toggle on" id="tglSms" onclick="toggleNotif('sms',this)"></div>
+              </div>
+              <div class="rounded-2xl p-4 flex items-center gap-3" style="background:rgba(56,225,255,.06);border:1px solid rgba(56,225,255,.2)">
+                <div class="w-10 h-10 rounded-xl flex items-center justify-center bg-sky-400/20"><i class="fa-solid fa-bell text-cyanx"></i></div>
+                <div class="flex-1"><div class="font-bold text-sm">Push Notifications</div><div class="text-[11px] text-slate-400">Instant in-app + device push</div></div>
+                <div class="toggle on" id="tglPush" onclick="toggleNotif('push',this)"></div>
+              </div>
+              <div class="rounded-2xl p-4" style="background:rgba(139,124,255,.06);border:1px solid rgba(139,124,255,.25)">
+                <div class="flex items-center gap-3">
+                  <div class="w-10 h-10 rounded-xl flex items-center justify-center bg-violet-400/20"><i class="fa-solid fa-envelope text-[#b7adff]"></i></div>
+                  <div class="flex-1"><div class="font-bold text-sm">Email <span class="chip ml-1 !text-[9px]" style="background:rgba(139,124,255,.15);color:#b7adff">OPTIONAL</span></div><div class="text-[11px] text-slate-400">Detailed reports</div></div>
+                  <div class="toggle" id="tglEmail" onclick="toggleNotif('email',this)"></div>
+                </div>
+                <div id="emailRow" class="hidden mt-3"><input id="emailInput" placeholder="you@example.com" class="field !py-2.5 text-sm" oninput="state.notifications.emailAddr=this.value"/></div>
+              </div>
+            </div>
+            <div class="mt-4">
+              <div class="text-xs font-bold tracking-widest text-slate-400 mb-2">DELIVERY LOG (STORED)</div>
+              <div class="rounded-2xl overflow-hidden" style="border:1px solid rgba(255,255,255,.1)">
+                <div class="p-3 flex gap-2 items-center" style="background:rgba(255,255,255,.04)"><div class="flex gap-1.5"><span class="w-2.5 h-2.5 rounded-full bg-red-400"></span><span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span><span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span></div><span class="text-[11px] tick text-slate-400 ml-2">sms-thread • stored locally</span></div>
+                <div id="notifLog" class="p-3 space-y-2 max-h-[220px] overflow-y-auto text-xs" style="background:rgba(0,0,0,.3)"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- BILLING -->
+        <section id="sec-billing" class="glass rounded-3xl p-6 sm:p-8">
+          <div class="flex items-center gap-4 flex-wrap">
+            <div><div class="grotesk font-bold text-2xl">Billing & Subscription</div><div class="text-sm text-slate-400">Secure payment gateway • UPI • Cards • Netbanking — same VoltEdge UI, nothing changed.</div></div>
+            <div class="ml-auto flex items-center gap-2"><span class="chip" style="background:rgba(34,240,200,.12);color:#6ffbe0;border:1px solid rgba(34,240,200,.3)">CURRENT: <span id="planLbl" class="ml-1">FREE</span></span><button onclick="openPayment()" class="btn-neon rounded-xl px-5 py-2.5 text-xs font-bold">MANAGE / PAY</button></div>
+          </div>
+          <div class="grid md:grid-cols-3 gap-4 mt-6" id="planCards"></div>
+          <div class="mt-6 rounded-2xl overflow-hidden" style="border:1px solid rgba(255,255,255,.1)">
+            <div class="px-5 py-3 text-xs font-bold tracking-widest text-slate-400" style="background:rgba(255,255,255,.04)">INVOICE HISTORY (STORED AFTER PAYMENT)</div>
+            <div class="overflow-x-auto"><table class="text-sm"><thead><tr class="text-left text-[11px] tracking-widest text-slate-500"><th class="px-5 py-3">INVOICE</th><th class="px-5 py-3">PLAN</th><th class="px-5 py-3">AMOUNT</th><th class="px-5 py-3">METHOD</th><th class="px-5 py-3">STATUS</th><th class="px-5 py-3">DATE</th></tr></thead><tbody id="invoiceBody"></tbody></table></div>
+            <div id="noInvoice" class="px-5 py-6 text-center text-sm text-slate-500">No payments yet — upgrade to generate invoices here.</div>
+          </div>
+        </section>
+
+        <footer class="text-center text-[11px] text-slate-500 pb-4">VoltEdge Smart Electricity Monitoring • BIS/ISI • CEA Guidelines 2024 • Data stored with AES-256 • Seasonal AI v3.2</footer>
+      </div>
+    </main>
+  </div>
+
+  <!-- MOBILE NAV -->
+  <nav class="lg:hidden fixed bottom-0 inset-x-0 z-40 px-4 pb-4"><div class="glass rounded-2xl flex justify-around py-3" style="border:1px solid rgba(34,240,200,.25)">
+    <button onclick="navTo('dashboard',document.querySelector('[data-nav=dashboard]'))" class="flex flex-col items-center gap-1 text-neon text-[10px] font-bold"><i class="fa-solid fa-gauge-high text-lg"></i>Home</button>
+    <button onclick="navTo('learning',document.querySelector('[data-nav=learning]'))" class="flex flex-col items-center gap-1 text-slate-400 text-[10px] font-bold"><i class="fa-solid fa-brain text-lg"></i>Learn</button>
+    <button onclick="openMeterModal()" class="w-14 h-14 -mt-8 rounded-2xl flex items-center justify-center text-xl" style="background:linear-gradient(135deg,#22f0c8,#38e1ff);box-shadow:0 10px 30px rgba(34,240,200,.5);color:#04120d"><i class="fa-solid fa-plug-circle-bolt"></i></button>
+    <button onclick="navTo('alerts',document.querySelector('[data-nav=alerts]'))" class="flex flex-col items-center gap-1 text-slate-400 text-[10px] font-bold"><i class="fa-solid fa-bell text-lg"></i>Alerts</button>
+    <button onclick="openPayment()" class="flex flex-col items-center gap-1 text-slate-400 text-[10px] font-bold"><i class="fa-solid fa-crown text-lg"></i>Pay</button>
+  </div></nav>
+</div>
+
+<!-- METER MODAL -->
+<div id="meterModal" class="hidden fixed inset-0 z-[100] modal-bg flex items-center justify-center p-4">
+  <div class="glass neon-border rounded-3xl w-full max-w-[560px] p-7 max-h-[92vh] overflow-y-auto">
+    <div class="flex items-center gap-3"><div class="w-11 h-11 rounded-2xl flex items-center justify-center" style="background:linear-gradient(135deg,#22f0c8,#38e1ff)"><i class="fa-solid fa-plug-circle-bolt text-[#04120d]"></i></div>
+      <div><div class="grotesk font-bold text-xl">Connect Smart Energy Meter</div><div class="text-xs text-slate-400">Fetch & store live consumption data</div></div>
+      <button onclick="closeMeterModal()" class="ml-auto btn-ghost rounded-xl w-9 h-9"><i class="fa-solid fa-xmark"></i></button></div>
+    <div id="meterStep1">
+      <label class="text-[11px] font-bold tracking-widest text-slate-400 mt-6 block mb-2">SELECT METER MODEL</label>
+      <div class="grid grid-cols-3 gap-2" id="meterModels"></div>
+      <label class="text-[11px] font-bold tracking-widest text-slate-400 mt-4 block mb-2">CONNECTION MODE</label>
+      <div class="grid grid-cols-3 gap-2" id="connModes"></div>
+      <label class="text-[11px] font-bold tracking-widest text-slate-400 mt-4 block mb-2">METER ID / SERIAL</label>
+      <input id="meterIdInput" class="field tick font-bold tracking-widest" placeholder="VE-2026-XXXXXX" value="VE-2026-847392"/>
+      <button onclick="pairMeter()" id="pairBtn" class="btn-neon w-full rounded-2xl py-4 mt-5 grotesk font-bold">TEST SIGNAL & PAIR <i class="fa-solid fa-satellite-dish ml-2"></i></button>
+    </div>
+    <div id="meterStep2" class="hidden text-center py-6">
+      <div class="spin-ring mx-auto"></div>
+      <div class="grotesk font-bold text-lg mt-5" id="pairStatus">Scanning for meter…</div>
+      <div class="process-bar mt-4"><div id="pairBar" style="width:5%"></div></div>
+      <div class="tick text-xs text-slate-400 mt-3" id="pairLog">Initializing Zigbee handshake…</div>
+    </div>
+    <div id="meterStep3" class="hidden text-center py-4">
+      <div class="w-20 h-20 mx-auto rounded-full flex items-center justify-center" style="background:linear-gradient(135deg,#22f0c8,#38e1ff);box-shadow:0 0 50px rgba(34,240,200,.6)"><i class="fa-solid fa-check text-3xl text-[#04120d]"></i></div>
+      <div class="grotesk font-bold text-2xl mt-4">Meter Connected! 🎉</div>
+      <p class="text-sm text-slate-400 mt-2">Fetching & storing consumption data…<br>Starting <b class="text-amberx">10-day learning phase</b> — alerts will be muted.</p>
+      <div class="rounded-2xl p-4 mt-4 text-left text-xs tick" id="meterInfoBox" style="background:rgba(34,240,200,.07);border:1px solid rgba(34,240,200,.25)"></div>
+      <button onclick="finishMeterConnect()" class="btn-neon w-full rounded-2xl py-4 mt-4 grotesk font-bold">START MONITORING <i class="fa-solid fa-arrow-right ml-2"></i></button>
+    </div>
+  </div>
+</div>
+
+<!-- PAYMENT MODAL -->
+<div id="payModal" class="hidden fixed inset-0 z-[100] modal-bg flex items-center justify-center p-4">
+  <div class="glass neon-border rounded-3xl w-full max-w-[880px] max-h-[93vh] overflow-y-auto">
+    <div class="grid md:grid-cols-5">
+      <div class="md:col-span-2 p-7" style="background:linear-gradient(180deg,rgba(34,240,200,.1),rgba(139,124,255,.08));border-right:1px solid rgba(255,255,255,.08)">
+        <div class="flex items-center gap-2"><i class="fa-solid fa-lock text-neon"></i><span class="grotesk font-bold">Secure Payment Gateway</span></div>
+        <div class="text-[11px] text-slate-400 mt-1 flex items-center gap-2"><span class="chip !text-[9px]" style="background:rgba(34,240,200,.12);color:#6ffbe0">PCI-DSS</span><span class="chip !text-[9px]" style="background:rgba(34,240,200,.12);color:#6ffbe0">256-BIT SSL</span><span class="chip !text-[9px]" style="background:rgba(34,240,200,.12);color:#6ffbe0">RBI COMPLIANT</span></div>
+        <label class="text-[11px] font-bold tracking-widest text-slate-300 mt-6 block mb-2">1 • CHOOSE PLAN</label>
+        <div class="space-y-2" id="payPlans"></div>
+        <div class="rounded-2xl p-4 mt-5 text-xs" style="background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.1)">
+          <div class="flex justify-between text-slate-400"><span>Plan</span><span class="tick text-white" id="sumPlan">Smart Plus • Monthly</span></div>
+          <div class="flex justify-between text-slate-400 mt-1"><span>Energy AI + alerts</span><span class="tick text-neon">Included</span></div>
+          <div class="flex justify-between text-slate-400 mt-1"><span>GST (18%)</span><span class="tick" id="sumGst">₹76</span></div>
+          <div class="h-px bg-white/10 my-2"></div>
+          <div class="flex justify-between grotesk font-bold text-lg"><span>Total</span><span class="tick text-neon" id="sumTotal">₹499</span></div>
+        </div>
+        <div class="flex items-center gap-2 mt-4 text-[11px] text-slate-500"><i class="fa-brands fa-cc-visa text-xl"></i><i class="fa-brands fa-cc-mastercard text-xl"></i><i class="fa-solid fa-building-columns"></i><span class="font-bold">UPI</span><i class="fa-solid fa-wallet"></i></div>
+      </div>
+      <div class="md:col-span-3 p-7">
+        <div class="flex items-center"><div class="grotesk font-bold text-xl">Checkout</div><button onclick="closePayment()" class="ml-auto btn-ghost rounded-xl w-9 h-9"><i class="fa-solid fa-xmark"></i></button></div>
+        <label class="text-[11px] font-bold tracking-widest text-slate-400 mt-5 block mb-2">2 • PAYMENT METHOD</label>
+        <div class="grid grid-cols-4 gap-2" id="payTabs">
+          <button onclick="switchPayTab('card',this)" class="rounded-xl py-3 text-xs font-bold border border-neon/50" style="background:rgba(34,240,200,.1)"><i class="fa-solid fa-credit-card block text-lg mb-1 text-neon"></i>Card</button>
+          <button onclick="switchPayTab('upi',this)" class="rounded-xl py-3 text-xs font-bold btn-ghost"><i class="fa-solid fa-mobile-screen block text-lg mb-1"></i>UPI</button>
+          <button onclick="switchPayTab('net',this)" class="rounded-xl py-3 text-xs font-bold btn-ghost"><i class="fa-solid fa-building-columns block text-lg mb-1"></i>Netbank</button>
+          <button onclick="switchPayTab('wallet',this)" class="rounded-xl py-3 text-xs font-bold btn-ghost"><i class="fa-solid fa-wallet block text-lg mb-1"></i>Wallet</button>
+        </div>
+        <div id="payForms" class="mt-5">
+          <div id="form-card">
+            <div class="rounded-2xl p-5 card-3d mb-4" style="background:linear-gradient(135deg,#0f2b3d,#1a2a52 50%,#2b1d5a);border:1px solid rgba(34,240,200,.3)">
+              <div class="flex justify-between items-center"><i class="fa-solid fa-bolt text-neon text-xl"></i><span class="tick text-xs text-slate-300">VOLTEDGE PAY</span></div>
+              <div class="tick tracking-[.2em] font-bold text-lg mt-5" id="ccPreview">•••• •••• •••• ••••</div>
+              <div class="flex justify-between mt-4 text-xs tick text-slate-300"><span id="ccNamePrev">CARDHOLDER NAME</span><span id="ccExpPrev">MM/YY</span></div>
+            </div>
+            <label class="text-[11px] font-bold tracking-widest text-slate-400 block mb-2">CARD NUMBER</label>
+            <input id="ccNum" class="field tick tracking-widest" placeholder="1234 5678 9012 3456" maxlength="19" oninput="ccFmt(this)"/>
+            <div class="grid grid-cols-3 gap-3 mt-3">
+              <div class="col-span-1"><label class="text-[11px] font-bold tracking-widest text-slate-400 block mb-2">NAME</label><input id="ccName" class="field" placeholder="Aarav Sharma" oninput="document.getElementById('ccNamePrev').innerText=this.value.toUpperCase()||'CARDHOLDER NAME'"/></div>
+              <div><label class="text-[11px] font-bold tracking-widest text-slate-400 block mb-2">EXPIRY</label><input id="ccExp" class="field tick" placeholder="MM/YY" maxlength="5" oninput="expFmt(this)"/></div>
+              <div><label class="text-[11px] font-bold tracking-widest text-slate-400 block mb-2">CVV</label><input id="ccCvv" type="password" class="field tick" placeholder="•••" maxlength="3" oninput="this.value=this.value.replace(/\D/g,'')"/></div>
+            </div>
+          </div>
+          <div id="form-upi" class="hidden">
+            <label class="text-[11px] font-bold tracking-widest text-slate-400 block mb-2">UPI ID</label>
+            <input id="upiId" class="field tick" placeholder="yourname@okhdfcbank"/>
+            <div class="grid grid-cols-4 gap-2 mt-3">
+              <button onclick="document.getElementById('upiId').value='user@okhdfc'" class="btn-ghost rounded-xl py-2 text-xs font-bold">GPay</button>
+              <button onclick="document.getElementById('upiId').value='user@okicici'" class="btn-ghost rounded-xl py-2 text-xs font-bold">PhonePe</button>
+              <button onclick="document.getElementById('upiId').value='user@paytm'" class="btn-ghost rounded-xl py-2 text-xs font-bold">Paytm</button>
+              <button onclick="document.getElementById('upiId').value='user@okaxis'" class="btn-ghost rounded-xl py-2 text-xs font-bold">BHIM</button>
+            </div>
+            <div class="rounded-2xl p-4 mt-4 flex items-center gap-4" style="background:rgba(34,240,200,.06);border:1px dashed rgba(34,240,200,.4)">
+              <div class="w-20 h-20 rounded-xl bg-white p-1 shrink-0"><div class="w-full h-full rounded-lg flex items-center justify-center text-[8px] font-bold text-black text-center leading-tight" style="background:repeating-linear-gradient(0deg,#000 0 2px,#fff 2px 4px)">QR<br>UPI<br>₹499</div></div>
+              <div class="text-xs text-slate-400">Scan with any UPI app to pay <b class="text-white tick" id="upiAmt">₹499</b> to <b class="text-neon">voltedge@razorpay</b>. Collect request will also be sent.</div>
+            </div>
+          </div>
+          <div id="form-net" class="hidden"><label class="text-[11px] font-bold tracking-widest text-slate-400 block mb-2">SELECT BANK</label><select id="bankSel" class="field"><option>HDFC Bank</option><option>State Bank of India</option><option>ICICI Bank</option><option>Axis Bank</option><option>Kotak Mahindra</option><option>Punjab National Bank</option></select></div>
+          <div id="form-wallet" class="hidden"><label class="text-[11px] font-bold tracking-widest text-slate-400 block mb-2">SELECT WALLET</label><div class="grid grid-cols-3 gap-2"><button class="btn-ghost rounded-xl py-3 text-xs font-bold">Paytm</button><button class="btn-ghost rounded-xl py-3 text-xs font-bold">PhonePe</button><button class="btn-ghost rounded-xl py-3 text-xs font-bold">Amazon Pay</button></div></div>
+        </div>
+        <div id="payActionRow">
+          <button onclick="processPayment()" id="payBtn" class="btn-neon w-full rounded-2xl py-4 mt-6 grotesk font-bold text-base"><i class="fa-solid fa-lock mr-2"></i>PAY <span id="payBtnAmt" class="tick">₹499</span> SECURELY</button>
+          <div class="text-center text-[11px] text-slate-500 mt-2">UI unchanged • Same theme • Instant invoice & receipt</div>
+        </div>
+        <div id="payProcessing" class="hidden mt-6 text-center">
+          <div class="spin-ring mx-auto"></div>
+          <div class="grotesk font-bold mt-4" id="procTxt">Contacting bank…</div>
+          <div class="process-bar mt-3"><div id="procBar" style="width:10%"></div></div>
+        </div>
+        <div id="paySuccess" class="hidden mt-6 text-center">
+          <div class="w-20 h-20 mx-auto rounded-full flex items-center justify-center" style="background:linear-gradient(135deg,#22f0c8,#38e1ff);box-shadow:0 0 50px rgba(34,240,200,.6)"><i class="fa-solid fa-check text-3xl text-[#04120d]"></i></div>
+          <div class="grotesk font-bold text-2xl mt-4">Payment Successful! 🎉</div>
+          <div class="text-sm text-slate-400 tick" id="successTxt">—</div>
+          <div class="flex gap-2 mt-4"><button onclick="closePayment()" class="btn-neon flex-1 rounded-xl py-3 text-xs font-bold">BACK TO DASHBOARD</button><button onclick="downloadReceipt()" class="btn-ghost flex-1 rounded-xl py-3 text-xs font-bold"><i class="fa-solid fa-receipt mr-1"></i>RECEIPT</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PUSH TOASTS + SMS TOAST -->
+<div id="pushZone" class="fixed top-5 right-5 z-[150] space-y-3 w-[340px] max-w-[calc(100vw-40px)]"></div>
+<div id="toastZone" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-[150] space-y-2 w-[420px] max-w-[calc(100vw-32px)]"></div>
+
+<script>
+/* ================= STATE ================= */
+const $ = id => document.getElementById(id);
+const state = {
+  user:{phone:null, verified:false},
+  otp:{code:null, timer:null, secs:30},
+  meter:{connected:false, id:null, model:'VoltEdge Pro X1', mode:'WiFi', signal:98},
+  learning:{active:true, day:0, total:10, season:'Autumn', history:[], baseline:null, autoSeason:true, startDate:new Date(), installSeason:'Winter'},
+  usage:{liveKW:1.2, todayKWH:4.2, liveSeries:Array(60).fill(1.2), historyDaily:[], costPerKwh:7.5},
+  thresholds:{warn:20, crit:40},
+  notifications:{sms:true, push:true, email:false, emailAddr:'', log:[]},
+  alerts:[], lastAlertAt:0,
+  plan:{current:'Free', billing:'Monthly'},
+  pay:{plan:'Smart Plus', billing:'Monthly', method:'card', lastTx:null},
+  invoices:[], liveOn:true, spikeUntil:0, histRange:'14'
+};
+const PLANS = {
+  'Free':{m:0,y:0,feat:['Live dashboard','7-day history','1 meter'],c:'#8a9bb5'},
+  'Smart Plus':{m:499,y:4799,feat:['10-day AI learning','SMS + Push alerts','Seasonal recalibration','30-day history','Bill forecasts'],c:'#22f0c8'},
+  'Pro Home':{m:899,y:8639,feat:['Everything in Plus','Email reports','3 meters + solar','Appliance AI','Priority support'],c:'#8b7cff'}
+};
+const SEASONS = [
+  {n:'Winter',icon:'❄️',months:'Dec – Feb',avg:18.5,note:'Heaters & geysers',next:'Dec 1'},
+  {n:'Spring',icon:'🌸',months:'Mar – May',avg:14.2,note:'Mild & balanced',next:'Mar 1'},
+  {n:'Summer',icon:'☀️',months:'Jun – Aug',avg:22.8,note:'AC peak load',next:'Jun 1'},
+  {n:'Autumn',icon:'🍂',months:'Sep – Nov',avg:13.6,note:'Post-monsoon dip',next:'Sep 1'}
+];
+function getSeasonByMonth(m){ if([11,0,1].includes(m)) return 'Winter'; if([2,3,4].includes(m)) return 'Spring'; if([5,6,7].includes(m)) return 'Summer'; return 'Autumn'; }
+
+/* ================= BOOT ================= */
+window.addEventListener('load', ()=>{
+  const msgs=['Initializing secure grid…','Linking auth service…','Loading seasonal AI…','Calibrating meters…','Ready.'];
+  let i=0; const bt=setInterval(()=>{ $('bootText').innerText=msgs[i++ % msgs.length]; },400);
+  state.learning.season = getSeasonByMonth(new Date().getMonth());
+  state.learning.installSeason='Winter';
+  seedHistory(); buildStatic(); initCharts(); startLiveLoop(); heroCount();
+  setTimeout(()=>{ clearInterval(bt); $('preloader').style.opacity='0'; setTimeout(()=>{ $('preloader').remove(); $('loginView').classList.remove('hidden'); },600); },1900);
+  $('dateLine').innerText = new Date().toLocaleDateString('en-IN',{weekday:'long', day:'numeric', month:'long', year:'numeric'});
+  updateSeasonUI();
+});
+function heroCount(){ let v=0; const t=setInterval(()=>{ v+=Math.random()*2; if(v>=28.4){v=28.4;clearInterval(t);} const el=$('heroKwh'); if(el) el.innerText=v.toFixed(1)+'%'; },80); }
+
+/* ================= LOGIN + OTP ================= */
+function sendOTP(){
+  const ph=$('phoneInput').value.trim();
+  if(!/^[6-9]\d{9}$/.test(ph)){ $('phoneErr').classList.remove('hidden'); $('phoneInput').style.borderColor='#ff6b6b'; return; }
+  state.user.phone=ph;
+  state.otp.code=String(Math.floor(100000+Math.random()*900000));
+  $('stepPhone').classList.add('hidden'); $('stepOtp').classList.remove('hidden'); $('stepNum').innerText='2';
+  $('maskedPhone').innerText='+91 '+ph.slice(0,2)+'••• ••'+ph.slice(-2);
+  $('demoOtpCard').classList.remove('hidden'); $('demoOtpVal').innerText=state.otp.code.split('').join(' ');
+  toast(`<b>SMS sent</b> to +91 ${ph} — demo OTP: <b class="tick">${state.otp.code}</b>`,'sms');
+  pushCard('VoltEdge Auth',`Your verification code is ${state.otp.code}. Valid for 5 mins. Never share it.`,'auth');
+  startResend(); setupOtpInputs(); document.querySelectorAll('.otp-box')[0].focus();
+}
+function startResend(){
+  clearInterval(state.otp.timer); state.otp.secs=30;
+  $('resendBtn').disabled=true; $('resendBtn').classList.add('text-slate-600');
+  state.otp.timer=setInterval(()=>{ state.otp.secs--; $('resendT').innerText=state.otp.secs;
+    if(state.otp.secs<=0){ clearInterval(state.otp.timer); $('resendBtn').disabled=false; $('resendBtn').innerHTML='Resend OTP'; $('resendBtn').classList.remove('text-slate-600'); $('resendBtn').classList.add('text-neon'); } },1000);
+}
+function resendOTP(){ state.otp.code=String(Math.floor(100000+Math.random()*900000)); $('demoOtpVal').innerText=state.otp.code.split('').join(' '); toast(`New OTP sent: <b class="tick">${state.otp.code}</b>`,'sms'); pushCard('VoltEdge Auth',`New code: ${state.otp.code}`,'auth'); startResend(); }
+function backToPhone(){ $('stepOtp').classList.add('hidden'); $('stepPhone').classList.remove('hidden'); $('stepNum').innerText='1'; }
+function setupOtpInputs(){
+  const boxes=[...document.querySelectorAll('.otp-box')];
+  boxes.forEach((b,i)=>{
+    b.value=''; b.classList.remove('filled');
+    b.oninput=()=>{ b.value=b.value.replace(/\D/g,'').slice(0,1); b.classList.toggle('filled',!!b.value); if(b.value&&i<5) boxes[i+1].focus(); $('otpErr').classList.add('hidden'); };
+    b.onkeydown=e=>{ if(e.key==='Backspace'&&!b.value&&i>0) boxes[i-1].focus(); if(e.key==='Enter') verifyOTP(); };
+    b.onpaste=e=>{ e.preventDefault(); const t=(e.clipboardData.getData('text')||'').replace(/\D/g,'').slice(0,6); t.split('').forEach((c,k)=>{ if(boxes[k]){boxes[k].value=c;boxes[k].classList.add('filled');} }); if(t.length) boxes[Math.min(t.length,5)].focus(); };
+  });
+}
+function otpValue(){ return [...document.querySelectorAll('.otp-box')].map(b=>b.value).join(''); }
+function autofillOTP(){ const c=state.otp.code||''; const boxes=[...document.querySelectorAll('.otp-box')]; c.split('').forEach((d,i)=>{ if(boxes[i]){boxes[i].value=d;boxes[i].classList.add('filled');} }); }
+function verifyOTP(){
+  if(otpValue()!==state.otp.code){ $('otpErr').classList.remove('hidden'); document.getElementById('otpRow').animate([{transform:'translateX(0)'},{transform:'translateX(-8px)'},{transform:'translateX(8px)'},{transform:'translateX(0)'}],{duration:300}); return; }
+  $('verifyBtn').innerHTML='<i class="fa-solid fa-circle-notch fa-spin mr-2"></i>VERIFYING…';
+  setTimeout(()=>{
+    state.user.verified=true;
+    $('verifyBtn').innerHTML='✓ VERIFIED — ENTERING…';
+    enterApp();
+  },900);
+}
+
+/* ================= ENTER APP ================= */
+function enterApp(){
+  $('loginView').classList.add('hidden'); $('appView').classList.remove('hidden');
+  const ph=state.user.phone;
+  $('topPhone').innerText='+91 '+ph.slice(-5);
+  $('sidePhone').innerText='+91 '+ph.slice(0,5)+' '+ph.slice(5);
+  $('avatarInit').innerText=ph.slice(-2);
+  $('smsTo').innerText='to +91 '+ph.slice(0,2)+'••• ••'+ph.slice(-2);
+  window.scrollTo(0,0);
+  toast(`Welcome! Phone <b class="tick">+91 ${ph}</b> verified ✓`,'ok');
+  pushCard('Welcome to VoltEdge 🎉','Meter not linked yet. Connect now to start your 10-day learning phase.','sys');
+  renderAll();
+  setTimeout(()=>{ if(!state.meter.connected) openMeterModal(); },1200);
+}
+function logout(){ location.reload(); }
+function navTo(sec,el){
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active')); if(el&&el.classList) el.classList.add('active');
+  const map={dashboard:'sec-dashboard',learning:'sec-learning',alerts:'sec-alerts',notifications:'sec-notifications',billing:'sec-billing'};
+  const t=document.getElementById(map[sec]); if(t) t.scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+/* ================= METER ================= */
+const MODELS=[{n:'VoltEdge Pro X1',p:'WiFi • 1-ph',img:'https://images.unsplash.com/photo-1558441337-90a6a2415bcf?q=80&w=400&auto=format&fit=crop'},{n:'VoltEdge 3-Ph Max',p:'Zigbee • 3-ph',img:'https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?q=80&w=400&auto=format&fit=crop'},{n:'VoltEdge Solar Duo',p:'Cellular • Solar',img:'https://images.unsplash.com/photo-1509391366360-2e959784a276?q=80&w=400&auto=format&fit=crop'}];
+const MODES=['WiFi','Zigbee','Cellular'];
+let selModel=0, selMode=0;
+function buildStatic(){
+  $('meterModels').innerHTML=MODELS.map((m,i)=>`<button onclick="selModel=${i};buildStatic()" class="rounded-2xl overflow-hidden text-left ${i===selModel?'ring-2 ring-emerald-300':''}" style="background:rgba(255,255,255,.05);border:1px solid ${i===selModel?'#22f0c8':'rgba(255,255,255,.1)'}"><img src="${m.img}" class="h-20 w-full object-cover"/><div class="p-2"><div class="text-[11px] font-bold leading-tight">${m.n}</div><div class="text-[10px] text-slate-400">${m.p}</div></div></button>`).join('');
+  $('connModes').innerHTML=MODES.map((m,i)=>`<button onclick="selModel;selMode=${i};buildStatic()" class="rounded-xl py-3 text-xs font-bold ${i===selMode?'btn-neon':'btn-ghost'}">${m}</button>`).join('');
+  const mq=['MTR-92841 • 1.9kW • Delhi','MTR-55210 • 3.2kW • Mumbai','MTR-78114 • 0.8kW • Bengaluru','MTR-31098 • 4.1kW • Jaipur','MTR-66402 • 2.4kW • Pune'];
+  $('marquee').innerHTML=(mq.concat(mq)).map(s=>`<span class="px-4 py-1.5 rounded-full mr-2" style="background:rgba(34,240,200,.08);border:1px solid rgba(34,240,200,.2)">⚡ ${s}</span>`).join('');
+  renderPlans(); renderPayPlans(); renderSeasons(); buildDayDots();
+}
+function openMeterModal(){ $('meterModal').classList.remove('hidden'); $('meterStep1').classList.remove('hidden'); $('meterStep2').classList.add('hidden'); $('meterStep3').classList.add('hidden'); }
+function closeMeterModal(){ $('meterModal').classList.add('hidden'); }
+function pairMeter(){
+  const id=$('meterIdInput').value.trim()||'VE-2026-847392';
+  state.meter.id=id; state.meter.model=MODELS[selModel].n; state.meter.mode=MODES[selMode];
+  $('meterStep1').classList.add('hidden'); $('meterStep2').classList.remove('hidden');
+  const logs=['Initializing '+state.meter.mode+' handshake…','Found '+id+' • RSSI -52dBm…','Authenticating AES-256 keys…','Syncing load profile…','Fetching 60s burst data…','Calibrating CT clamps…','Link established ✓'];
+  let p=0; $('pairBar').style.width='5%';
+  const iv=setInterval(()=>{ p+=Math.random()*18; if(p>=100){p=100;clearInterval(iv); setTimeout(showPaired,500);} $('pairBar').style.width=p+'%'; $('pairStatus').innerText=p<40?'Scanning for meter…':p<75?'Pairing secure channel…':'Finalizing…'; $('pairLog').innerText=logs[Math.min(logs.length-1,Math.floor(p/15))]; },450);
+}
+function showPaired(){
+  $('meterStep2').classList.add('hidden'); $('meterStep3').classList.remove('hidden');
+  state.meter.connected=true; state.meter.signal=92+Math.floor(Math.random()*7);
+  $('meterInfoBox').innerHTML=`MODEL: <b>${state.meter.model}</b><br>ID: <b>${state.meter.id}</b> • ${state.meter.mode} • Signal ${state.meter.signal}%<br>LAST SYNC: <b>just now</b> • 2s interval • storage: <b>cloud + local</b>`;
+}
+function finishMeterConnect(){
+  closeMeterModal(); updateConnUI();
+  startLearning(state.learning.season,'New meter connected');
+  toast(`Meter <b>${state.meter.id}</b> linked — fetching & storing data ✓`,'ok');
+}
+
+/* ================= LEARNING ================= */
+function startLearning(season,reason){
+  state.learning.active=true; state.learning.day=0; state.learning.season=season;
+  state.learning.history=[]; state.learning.baseline=null; state.learning.startDate=new Date();
+  updateSeasonUI(); renderLearning(); updateConnUI();
+  pushCard('📚 Learning started',`${reason} — 10-day baseline for ${season}. Alerts muted.`,'learn');
+  addNotifLog('push','Learning started',`${reason}. Day 0/10 • ${season}`);
+  if(state.notifications.sms) addNotifLog('sms','Learning started',`VoltEdge: 10-day learning begun (${season}). Alerts paused till baseline ready.`);
+}
+function restartLearning(reason){ startLearning(state.learning.season, reason||'Manual restart'); toast('10-day learning <b>restarted</b> — you can repeat anytime ✓','warn'); }
+function simulateSeason(s){
+  if(!s) return;
+  if(!state.learning.autoSeason){ toast('Auto seasonal learning is OFF — enable it to auto-start phases.','warn'); $('seasonSim').value=''; return; }
+  state.learning.season=s; updateSeasonUI(); renderSeasons();
+  startLearning(s,`Season changed to ${s} — auto recalibration`);
+  $('seasonSim').value='';
+}
+function toggleAutoSeason(el){
+  state.learning.autoSeason=!state.learning.autoSeason;
+  document.querySelectorAll('#autoSeasonToggle,#autoSeasonToggleSide').forEach(t=>t.classList.toggle('on',state.learning.autoSeason));
+  toast(state.learning.autoSeason?'Seasonal auto-recalibration <b>ENABLED</b>':'Seasonal auto-recalibration <b>PAUSED</b>','ok');
+}
+function simulateDay(){
+  if(!state.learning.active){ toast('Learning already complete. <b>Restart anytime</b> to recalibrate.','warn'); return; }
+  const s=SEASONS.find(x=>x.n===state.learning.season);
+  const base=s?s.avg:14;
+  const val=+(base+(Math.random()*3-1.5)).toFixed(1);
+  state.learning.history.push(val); state.learning.day=Math.min(10,state.learning.history.length);
+  state.usage.historyDaily[state.usage.historyDaily.length-1-(10-state.learning.day)]=val;
+  renderLearning(); drawHist();
+  if(state.learning.day>=10) completeLearning();
+  else toast(`Day ${state.learning.day}/10 stored: <b class="tick">${val} kWh</b>`,'ok');
+}
+function fastForward(){ if(!state.learning.active) return; while(state.learning.active) simulateDay(); }
+function completeLearning(){
+  const h=state.learning.history; const avg=+(h.reduce((a,b)=>a+b,0)/h.length).toFixed(1);
+  state.learning.baseline=avg; state.learning.active=false;
+  renderLearning(); renderKPIs(); drawHist();
+  const msg=`Baseline established: ${avg} kWh/day (${state.learning.season}). Alerts now ACTIVE.`;
+  pushCard('✅ Baseline ready',msg,'sys'); addNotifLog('push','Baseline ready',msg);
+  if(state.notifications.sms) addNotifLog('sms','Baseline ready',`VoltEdge: Avg ${avg} kWh/day set. High-usage alerts now ON.`);
+  if(state.notifications.email&&state.notifications.emailAddr) addNotifLog('email','Baseline ready',`Report sent to ${state.notifications.emailAddr}`);
+  toast(`<b>Learning complete!</b> Average = <b class="tick">${avg} kWh/day</b>. Alerts enabled ✓`,'ok');
+}
+function buildDayDots(){ $('dayDots').innerHTML=Array.from({length:10},(_,i)=>`<div class="day-dot" id="dd${i}">${i+1}</div>`).join(''); }
+function renderLearning(){
+  const L=state.learning;
+  buildDayDots();
+  for(let i=0;i<10;i++){ const d=$('dd'+i); if(!d) continue; d.className='day-dot'+(i<L.day?' done':(i===L.day&&L.active?' current':'')); d.innerHTML=i<L.day?'✓':(i+1); }
+  const pct=Math.round(L.day/10*100);
+  $('learnBar').style.width=pct+'%'; $('learnBarTop').style.width=pct+'%';
+  $('learnDayLbl').innerText=L.day; $('learnPctLbl').innerText=pct+'%';
+  $('learnSeasonLbl').innerText=L.season+' Learning';
+  const end=new Date(L.startDate); end.setDate(end.getDate()+10);
+  const es=end.toLocaleDateString('en-IN',{day:'numeric',month:'short'});
+  $('learnEndDate').innerText=es; $('learnEndDate2').innerText=es;
+  $('navLearnBadge').innerText=L.active?`DAY ${L.day}/10`:'READY ✓';
+  $('navLearnBadge').style.background=L.active?'rgba(255,181,71,.2)':'rgba(34,240,200,.2)';
+  $('navLearnBadge').style.color=L.active?'#ffb547':'#6ffbe0';
+  const top=$('learnBadgeTop');
+  if(L.active){ top.style.display=''; top.innerHTML=`<i class="fa-solid fa-brain mr-1"></i> LEARNING • DAY ${L.day}/10`; $('learnBanner').style.display='flex'; $('alertPolicyTxt').innerText='All high-usage alerts are MUTED until baseline is established. Notifications resume automatically on Day 11.'; }
+  else{ top.innerHTML=`<i class="fa-solid fa-circle-check mr-1"></i> BASELINE ${L.baseline} KWH`; top.style.background='rgba(34,240,200,.12)'; top.style.color='#6ffbe0'; top.style.border='1px solid rgba(34,240,200,.35)'; $('learnBanner').style.display='none'; $('alertPolicyTxt').innerText='Baseline active. High-usage detection is ON — alerts via SMS, Push & Email.'; }
+  $('learnDaysGrid').innerHTML=L.history.length?L.history.map((v,i)=>`<div class="rounded-xl p-2.5 text-center" style="background:rgba(34,240,200,.07);border:1px solid rgba(34,240,200,.2)"><div class="text-[9px] font-bold tracking-widest text-slate-400">DAY ${i+1}</div><div class="grotesk font-bold tick">${v}</div><div class="text-[9px] text-slate-500">kWh</div></div>`).join(''):'<div class="col-span-5 text-center text-xs text-slate-500 py-4">No days recorded yet — press “Simulate Next Day”.</div>';
+  $('kpiAvg').innerText=L.baseline??'—';
+  $('kpiAvgSub').innerText=L.active?`Learning… day ${L.day}/10 • ${L.season}`:`${L.season} baseline • recalibrates each season`;
+  renderSeasons();
+}
+function renderSeasons(){
+  const cur=state.learning.season;
+  $('seasonGrid').innerHTML=SEASONS.map(s=>`<div class="season-card rounded-2xl p-3 text-center ${s.n===cur?'active':''}" style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1)"><div class="text-2xl">${s.icon}</div><div class="font-bold text-xs mt-1">${s.n}</div><div class="text-[10px] text-slate-400">${s.months}</div><div class="text-[10px] tick text-neon mt-1">~${s.avg} kWh</div></div>`).join('');
+  const order=['Winter','Spring','Summer','Autumn']; const nx=order[(order.indexOf(cur)+1)%4];
+  const sObj=SEASONS.find(s=>s.n===nx);
+  $('nextSeasonTxt').innerHTML=`<b>${sObj.icon} ${nx}</b> • ~${sObj.next} • auto 10-day phase ${state.learning.autoSeason?'<b class="text-neon">SCHEDULED ✓</b>':'<b class="text-amberx">PAUSED</b>'}`;
+  $('installSeason').innerText=state.learning.installSeason.toLowerCase();
+}
+function updateSeasonUI(){
+  const s=state.learning.season; const ic={Winter:'❄️',Spring:'🌸',Summer:'☀️',Autumn:'🍂'}[s];
+  $('seasonPill').innerText=`${ic} ${s.toUpperCase()}`;
+}
+function updateConnUI(){
+  const c=state.meter.connected;
+  $('connPill').innerHTML=c?`<span class="w-2 h-2 rounded-full bg-emerald-400 inline-block mr-1 pulse-dot"></span> METER ONLINE`:`<span class="w-2 h-2 rounded-full bg-red-400 inline-block mr-1"></span> METER OFFLINE`;
+  $('connPill').style.background=c?'rgba(34,240,200,.12)':'rgba(255,100,100,.12)';
+  $('connPill').style.color=c?'#6ffbe0':'#ff9a9a';
+  $('connPill').style.border=c?'1px solid rgba(34,240,200,.35)':'1px solid rgba(255,100,100,.3)';
+  $('meterDot').className='ml-auto w-2 h-2 rounded-full '+(c?'bg-emerald-400':'bg-red-400');
+  $('meterIdLabel').innerText=c?state.meter.id+' • '+state.meter.mode:'No meter';
+  $('meterName').innerText=c?state.meter.model+' • '+state.meter.id:'No meter linked';
+  $('meterSub').innerText=c?`${state.meter.mode} • Signal ${state.meter.signal}% • storing every 2s`:'Connect to start 10-day learning';
+}
+
+/* ================= LIVE DATA + DETECTION ================= */
+function seedHistory(){
+  const arr=[]; const today=new Date();
+  for(let i=29;i>=0;i--){ const d=new Date(today); d.setDate(d.getDate()-i);
+    const season=getSeasonByMonth(d.getMonth()); const b=SEASONS.find(s=>s.n===season).avg;
+    arr.push({d:d.toLocaleDateString('en-IN',{day:'numeric',month:'short'}), v:+(b+(Math.random()*4-2)).toFixed(1)}); }
+  state.usage.historyDaily=arr;
+}
+function timeFactor(){ const h=new Date().getHours(); if(h>=18&&h<=22) return 1.7; if(h>=9&&h<=17) return 1.1; if(h>=0&&h<=5) return 0.45; return 0.8; }
+function expectedKW(){ const base=state.learning.baseline||14.5; return +(base/24*timeFactor()*3.2).toFixed(2); }
+function startLiveLoop(){ setInterval(()=>{ if(!state.liveOn) return; tickLive(); },2000); }
+function tickLive(){
+  const now=Date.now();
+  const spiking=now<state.spikeUntil;
+  const exp=expectedKW();
+  let kw=exp*(0.85+Math.random()*0.3);
+  if(spiking) kw=exp*(1.55+Math.random()*0.4);
+  if(!state.meter.connected) kw=0.4+Math.random()*0.6;
+  state.usage.liveKW=+kw.toFixed(2);
+  state.usage.liveSeries.push(state.usage.liveKW); if(state.usage.liveSeries.length>60) state.usage.liveSeries.shift();
+  state.usage.todayKWH=+(state.usage.todayKWH+state.usage.liveKW*(2/3600)).toFixed(3);
+  liveChart.data.datasets[0].data=state.usage.liveSeries; liveChart.data.datasets[1].data=state.usage.liveSeries.map(()=>exp); liveChart.update('none');
+  $('voltV').innerText=(228+Math.random()*8).toFixed(1)+' V';
+  $('ampV').innerText=(state.usage.liveKW*1000/230).toFixed(1)+' A';
+  renderKPIs(); checkHighUsage();
+}
+function spikeUsage(){ if(!state.meter.connected){ toast('Connect a meter first to test spike detection.','warn'); openMeterModal(); return; } if(state.learning.active){ toast('Spike simulated — but <b>alerts are muted</b> during learning (Day '+state.learning.day+'/10).','warn'); } state.spikeUntil=Date.now()+12000; toast('⚡ Load spike injected for 12s (AC + geyser + oven)','warn'); }
+function checkHighUsage(){
+  if(!state.meter.connected||state.learning.active||!state.learning.baseline) return;
+  const exp=expectedKW(); const live=state.usage.liveKW;
+  const pct=((live-exp)/exp)*100;
+  if(pct>=state.thresholds.warn && Date.now()-state.lastAlertAt>25000){
+    state.lastAlertAt=Date.now();
+    const lvl=pct>=state.thresholds.crit?'critical':'warning';
+    createAlert(lvl,live,exp,pct);
+  }
+  const hb=$('highBanner');
+  if(pct>=state.thresholds.warn){ hb.classList.remove('hidden'); hb.classList.add('flex'); $('highBannerText').innerText=`Drawing ${live.toFixed(2)} kW vs expected ${exp.toFixed(2)} kW (+${pct.toFixed(0)}%). Notifications sent via enabled channels.`; }
+  else{ hb.classList.add('hidden'); hb.classList.remove('flex'); }
+}
+function createAlert(lvl,live,exp,pct){
+  const a={id:'ALT-'+Math.floor(1000+Math.random()*9000), lvl, live:+live.toFixed(2), exp:+exp.toFixed(2), pct:+pct.toFixed(1), t:new Date(), msg:lvl==='critical'?`Critical surge: ${live.toFixed(2)} kW (+${pct.toFixed(0)}% over avg). Possible faulty appliance!`:`High usage: ${live.toFixed(2)} kW (+${pct.toFixed(0)}% over avg). Check AC / geyser.`};
+  state.alerts.unshift(a); renderAlerts(); sendNotifications(a);
+}
+function sendNotifications(a){
+  const n=state.notifications;
+  if(n.push){ pushCard(a.lvl==='critical'?'🚨 Critical power surge':'⚠️ High usage alert',`${a.msg} [${a.id}]`, a.lvl); addNotifLog('push',a.id,a.msg); }
+  if(n.sms) addNotifLog('sms',a.id,`VoltEdge: ${a.msg} Reply STOP to opt out.`);
+  if(n.email&&n.emailAddr) addNotifLog('email',a.id,`Detailed report mailed to ${n.emailAddr}: ${a.msg}`);
+  if(!n.push&&!n.sms&&!n.email) toast('Alert generated but <b>all channels are OFF</b> — enable SMS/Push.','warn');
+}
+function renderKPIs(){
+  $('kpiKw').innerText=state.usage.liveKW.toFixed(2);
+  $('kwMiniBar').style.width=Math.min(100,state.usage.liveKW/6*100)+'%';
+  const exp=expectedKW(); const pct=exp?((state.usage.liveKW-exp)/exp*100):0;
+  const sub=$('kpiKwSub');
+  if(!state.meter.connected){ sub.innerText='○ Demo feed — connect meter'; sub.style.color='#8a9bb5'; }
+  else if(state.learning.active){ sub.innerText='● Learning — alerts muted'; sub.style.color='#ffb547'; }
+  else if(pct>=state.thresholds.crit){ sub.innerText=`▲ +${pct.toFixed(0)}% CRITICAL`; sub.style.color='#ff6b6b'; }
+  else if(pct>=state.thresholds.warn){ sub.innerText=`▲ +${pct.toFixed(0)}% above average`; sub.style.color='#ffb547'; }
+  else{ sub.innerText='● Normal draw'; sub.style.color='#6ffbe0'; }
+  $('kpiToday').innerText=state.usage.todayKWH.toFixed(1);
+  $('kpiCost').innerText=Math.round(state.usage.todayKWH*state.usage.costPerKwh);
+  const proj=state.usage.todayKWH*30;
+  $('kpiBill').innerText=Math.round(proj*state.usage.costPerKwh).toLocaleString('en-IN');
+  $('kpiCo2').innerText=Math.round(proj*0.82);
+  $('kpiTrees').innerText=Math.round(proj*0.82/21);
+  // gauge
+  const gpct=Math.max(-50,Math.min(100,pct));
+  $('gaugePct').innerText=(pct>=0?'+':'')+pct.toFixed(0)+'%';
+  $('gaugePct').style.color=pct>=state.thresholds.crit?'#ff6b6b':pct>=state.thresholds.warn?'#ffb547':'#6ffbe0';
+  $('gaugeArc').style.strokeDashoffset=252-(252*Math.min(100,Math.max(0,(gpct+50)/150)));
+  $('gaugeNeedle').style.transform=`translateX(-50%) rotate(${-90+ (Math.min(100,Math.max(0,(gpct+50)/150))*180)}deg)`;
+  $('normalRange').innerText=state.learning.baseline?`< ${((expectedKW()*(1+state.thresholds.warn/100))).toFixed(2)} kW`:'—';
+}
+function setThresh(k,v){ state.thresholds[k]=+v; $('warnVal').innerText=state.thresholds.warn+'%'; $('critVal').innerText=state.thresholds.crit+'%'; $('warnLbl').innerText=state.thresholds.warn; $('warnLbl2').innerText=state.thresholds.warn; $('critLbl').innerText=state.thresholds.crit; $('critLbl2').innerText=state.thresholds.crit; }
+function toggleLive(){ state.liveOn=!state.liveOn; $('liveBtn').innerHTML=state.liveOn?'<i class="fa-solid fa-pause mr-1"></i>PAUSE':'<i class="fa-solid fa-play mr-1"></i>RESUME'; }
+function clearAlerts(){ state.alerts=[]; renderAlerts(); }
+function renderAlerts(){
+  $('navAlertCount').innerText=state.alerts.length; $('alertCountPill').innerText=state.alerts.length+' TOTAL';
+  if(!state.alerts.length){ $('alertsList').innerHTML=`<div class="rounded-2xl p-8 text-center" style="background:rgba(34,240,200,.05);border:1px dashed rgba(34,240,200,.3)"><div class="text-3xl">🛡️</div><div class="font-bold mt-2">All clear — no unusual consumption</div><div class="text-xs text-slate-400 mt-1">${state.learning.active?'Learning phase active: alerts are muted until Day 11.':'Detection engine watching every 2 seconds.'}</div></div>`; return; }
+  $('alertsList').innerHTML=state.alerts.map(a=>`<div class="alert-row rounded-2xl p-4 flex gap-3 items-start" style="background:${a.lvl==='critical'?'rgba(255,80,80,.07)':'rgba(255,181,71,.06)'};border:1px solid ${a.lvl==='critical'?'rgba(255,80,80,.35)':'rgba(255,181,71,.3)'}">
+    <div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style="background:${a.lvl==='critical'?'linear-gradient(135deg,#ff5050,#ff9a3d)':'linear-gradient(135deg,#ffb547,#ff8a3d)'}"><i class="fa-solid ${a.lvl==='critical'?'fa-siren':'fa-triangle-exclamation'} text-white"></i></div>
+    <div class="flex-1 min-w-0"><div class="flex items-center gap-2 flex-wrap"><b class="text-sm">${a.id}</b><span class="chip !text-[9px]" style="background:${a.lvl==='critical'?'rgba(255,80,80,.2)':'rgba(255,181,71,.2)'};color:${a.lvl==='critical'?'#ff9a9a':'#ffb547'}">${a.lvl.toUpperCase()} +${a.pct}%</span><span class="text-[11px] text-slate-500 ml-auto tick">${a.t.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit',second:'2-digit'})}</span></div>
+    <div class="text-xs text-slate-300 mt-1">${a.msg}</div><div class="text-[11px] tick text-slate-500 mt-1">Live ${a.live} kW • Expected ${a.exp} kW • Notified via ${[state.notifications.sms&&'SMS',state.notifications.push&&'Push',state.notifications.email&&'Email'].filter(Boolean).join(' + ')||'—'}</div></div></div>`).join('');
+}
+
+/* ================= NOTIFICATIONS ================= */
+function toggleNotif(k,el){ state.notifications[k]=!state.notifications[k]; el.classList.toggle('on',state.notifications[k]); if(k==='email') $('emailRow').classList.toggle('hidden',!state.notifications[k]); toast(`${k.toUpperCase()} notifications <b>${state.notifications[k]?'ENABLED':'DISABLED'}</b>`,'ok'); }
+function addNotifLog(ch,title,body){
+  const icons={sms:'fa-message',push:'fa-bell',email:'fa-envelope',auth:'fa-shield-halved',learn:'fa-brain',sys:'fa-bolt'};
+  const colors={sms:'#22f0c8',push:'#38e1ff',email:'#b7adff',auth:'#ffb547',learn:'#8b7cff',sys:'#22f0c8'};
+  state.notifications.log.unshift({ch,title,body,t:new Date()});
+  const L=$('notifLog');
+  L.innerHTML=state.notifications.log.slice(0,20).map(l=>{
+    if(l.ch==='sms') return `<div class="flex"><div class="sms-bubble" style="background:linear-gradient(135deg,#0f3d36,#123);border:1px solid rgba(34,240,200,.3)"><div class="text-[10px] font-bold text-neon tracking-widest">SMS • VM-VOLTED • ${l.t.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</div><div class="mt-1 text-slate-200">${l.body}</div></div></div>`;
+    return `<div class="rounded-xl px-3 py-2 flex gap-2 items-start" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08)"><i class="fa-solid ${icons[l.ch]||'fa-bell'} mt-0.5" style="color:${colors[l.ch]||'#fff'}"></i><div><b>${l.title}</b> <span class="text-slate-400">• ${l.ch.toUpperCase()} • ${l.t.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</span><div class="text-slate-300 mt-0.5">${l.body}</div></div></div>`;
+  }).join('')||'<div class="text-slate-500 text-center py-4">No notifications yet.</div>';
+}
+function pushCard(title,body,kind){
+  if(kind!=='auth'&&kind!=='sys'&&kind!=='learn'&&!state.notifications.push&&kind!=='auth') { }
+  const col=kind==='critical'?'#ff5050':kind==='auth'?'#ffb547':kind==='learn'?'#8b7cff':'#22f0c8';
+  const el=document.createElement('div');
+  el.className='toast-push glass rounded-2xl p-4 flex gap-3 items-start'; el.style.border=`1px solid ${col}66`;
+  el.innerHTML=`<div class="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style="background:${col}22"><i class="fa-solid ${kind==='auth'?'fa-shield-halved':kind==='learn'?'fa-brain':kind==='critical'?'fa-siren':'fa-bell'}" style="color:${col}"></i></div><div class="flex-1 min-w-0"><div class="font-bold text-sm">${title}</div><div class="text-xs text-slate-300 mt-0.5 leading-relaxed">${body}</div><div class="text-[10px] text-slate-500 mt-1">now • VoltEdge ${kind==='auth'?'Auth':kind==='learn'?'Learning AI':'Push'}</div></div><button class="text-slate-500 hover:text-white" onclick="this.parentElement.remove()"><i class="fa-solid fa-xmark"></i></button>`;
+  $('pushZone').appendChild(el); setTimeout(()=>{ el.style.transition='.5s'; el.style.opacity='0'; el.style.transform='translateX(30%)'; setTimeout(()=>el.remove(),500); },6000);
+}
+function toast(html,type){
+  const col=type==='warn'?'#ffb547':type==='sms'?'#38e1ff':type==='err'?'#ff6b6b':'#22f0c8';
+  const el=document.createElement('div');
+  el.className='glass rounded-2xl px-4 py-3 text-xs flex items-center gap-3'; el.style.border=`1px solid ${col}55`;
+  el.innerHTML=`<span class="w-2 h-2 rounded-full shrink-0" style="background:${col};box-shadow:0 0 10px ${col}"></span><span>${html}</span>`;
+  $('toastZone').appendChild(el); setTimeout(()=>{ el.style.transition='.5s'; el.style.opacity='0'; setTimeout(()=>el.remove(),500); },4200);
+}
+
+/* ================= CHARTS ================= */
+let liveChart,histChart,donutChart;
+function initCharts(){
+  Chart.defaults.color='#8a9bb5'; Chart.defaults.font.family='Inter'; Chart.defaults.borderColor='rgba(255,255,255,.06)';
+  liveChart=new Chart($('liveChart'),{type:'line',data:{labels:Array(60).fill(''),datasets:[{data:state.usage.liveSeries,borderColor:'#22f0c8',borderWidth:2.5,pointRadius:0,tension:.45,fill:true,backgroundColor:(c)=>{const g=c.chart.ctx.createLinearGradient(0,0,0,280);g.addColorStop(0,'rgba(34,240,200,.35)');g.addColorStop(1,'rgba(34,240,200,0)');return g;}},{data:Array(60).fill(expectedKW()),borderColor:'#ffb547',borderDash:[6,6],borderWidth:1.5,pointRadius:0,tension:.4}]},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{display:false},y:{ticks:{callback:v=>v+'kW'},grid:{color:'rgba(255,255,255,.05)'}}}}});
+  drawHist();
+  donutChart=new Chart($('donutChart'),{type:'doughnut',data:{labels:['AC & Cooling','Geyser & Heating','Kitchen','Lighting','Electronics','Others'],datasets:[{data:[34,22,16,10,12,6],backgroundColor:['#22f0c8','#ffb547','#38e1ff','#8b7cff','#ff6b9d','#5a6d8a'],borderColor:'#0b1326',borderWidth:4}]},options:{responsive:true,maintainAspectRatio:false,cutout:'68%',plugins:{legend:{display:false}}}});
+  $('applianceList').innerHTML=[['AC & Cooling','34%','#22f0c8'],['Geyser & Heating','22%','#ffb547'],['Kitchen','16%','#38e1ff'],['Lighting','10%','#8b7cff'],['Electronics','12%','#ff6b9d']].map(a=>`<div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full" style="background:${a[2]}"></span><span class="flex-1">${a[0]}</span><b class="tick">${a[1]}</b></div>`).join('');
+  $('aiInsights').innerHTML=[['fa-moon','Night load high','Fridge + router = 0.4kW standby. Save ₹180/mo.'],['fa-snowflake','AC is 34% of bill','+1°C saves ~6%. Auto-curtail in Pro.'],['fa-arrow-trend-up','Weekend spike','Sat usage 22% over baseline avg.']].map(i=>`<div class="rounded-xl p-3 glass-2"><i class="fa-solid ${i[0]} text-neon"></i><div class="font-bold text-xs mt-1">${i[1]}</div><div class="text-[11px] text-slate-400 mt-0.5">${i[2]}</div></div>`).join('');
+}
+function drawHist(){
+  const n=state.histRange==='30'?30:state.histRange==='season'?90:14;
+  const data=state.usage.historyDaily.slice(-n);
+  const base=state.learning.baseline;
+  if(histChart) histChart.destroy();
+  histChart=new Chart($('histChart'),{type:'bar',data:{labels:data.map(d=>d.d),datasets:[{data:data.map(d=>d.v),backgroundColor:data.map(d=>base&&d.v>base*1.2?'#ff6b6b':base&&d.v>base?'#ffb547':'#22f0c8'),borderRadius:6,borderSkipped:false},{type:'line',data:data.map(()=>base||null),borderColor:'#fff',borderDash:[5,5],pointRadius:0,borderWidth:1.5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>` ${c.raw} kWh`}}},scales:{x:{ticks:{maxTicksLimit:10,font:{size:10}}},y:{ticks:{callback:v=>v},grid:{color:'rgba(255,255,255,.05)'}}}}});
+}
+function setHistRange(r,btn){ state.histRange=r; document.querySelectorAll('#histTabs button').forEach(b=>{b.className='rounded-lg px-3 py-1.5 text-xs font-bold btn-ghost';}); btn.className='rounded-lg px-3 py-1.5 text-xs font-bold btn-neon'; drawHist(); }
+function exportCSV(){ const rows=['date,kwh']; state.usage.historyDaily.forEach(d=>rows.push(`${d.d},${d.v}`)); const blob=new Blob([rows.join('\n')],{type:'text/csv'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='voltedge-usage.csv'; a.click(); toast('Usage history exported as CSV ✓','ok'); }
+
+/* ================= BILLING + PAYMENT ================= */
+function renderPlans(){
+  $('planCards').innerHTML=Object.entries(PLANS).map(([n,p])=>`<div class="rounded-2xl p-6 card-hover ${state.plan.current===n?'neon-border':''}" style="background:${state.plan.current===n?'linear-gradient(180deg,rgba(34,240,200,.12),rgba(34,240,200,.03))':'rgba(255,255,255,.04)'};border:1px solid ${state.plan.current===n?'rgba(34,240,200,.4)':'rgba(255,255,255,.1)'}">
+    <div class="flex items-center gap-2"><span class="w-2.5 h-2.5 rounded-full" style="background:${p.c}"></span><b class="grotesk">${n}</b>${state.plan.current===n?'<span class="chip ml-auto !text-[9px]" style="background:rgba(34,240,200,.2);color:#6ffbe0">ACTIVE</span>':''}</div>
+    <div class="grotesk font-bold text-3xl mt-3">₹${p.m}<span class="text-sm text-slate-400 font-inter font-normal">/mo</span></div>
+    <div class="text-[11px] text-slate-400">or ₹${p.y}/yr (save 20%)</div>
+    <ul class="text-xs text-slate-300 mt-4 space-y-1.5">${p.feat.map(f=>`<li><i class="fa-solid fa-check text-neon mr-2"></i>${f}</li>`).join('')}</ul>
+    <button onclick="openPayment('${n}')" class="w-full rounded-xl py-3 mt-5 text-xs font-bold ${state.plan.current===n?'btn-ghost':'btn-neon'}">${state.plan.current===n?'MANAGE':'UPGRADE TO '+n.toUpperCase()}</button></div>`).join('');
+  $('planLbl').innerText=state.plan.current.toUpperCase();
+}
+function renderPayPlans(){
+  $('payPlans').innerHTML=Object.entries(PLANS).filter(([n])=>n!=='Free').map(([n,p])=>`<button onclick="selectPayPlan('${n}')" id="pp-${n.replace(/\s/g,'')}" class="rounded-2xl p-4 text-left transition ${state.pay.plan===n?'ring-2 ring-emerald-300':''}" style="background:${state.pay.plan===n?'rgba(34,240,200,.1)':'rgba(255,255,255,.04)'};border:1px solid ${state.pay.plan===n?'#22f0c8':'rgba(255,255,255,.1)'}"><div class="flex justify-between items-center"><b class="text-sm">${n}</b><span class="tick font-bold text-neon">₹${p.m}/mo</span></div><div class="text-[11px] text-slate-400 mt-1">₹${p.y}/yr • save 20% • <button class="underline" onclick="event.stopPropagation();toggleBilling()">${state.pay.billing}</button></div></button>`).join('')+`<button onclick="toggleBilling()" class="w-full text-[11px] font-bold text-cyanx mt-1">⇄ Switch to ${state.pay.billing==='Monthly'?'Yearly (save 20%)':'Monthly'}</button>`;
+  calcSummary();
+}
+function toggleBilling(){ state.pay.billing=state.pay.billing==='Monthly'?'Yearly':'Monthly'; renderPayPlans(); }
+function selectPayPlan(n){ state.pay.plan=n; renderPayPlans(); }
+function openPayment(pre){
+  if(pre&&pre!=='Free') state.pay.plan=pre;
+  $('payModal').classList.remove('hidden'); renderPayPlans();
+  $('payActionRow').classList.remove('hidden'); $('payProcessing').classList.add('hidden'); $('paySuccess').classList.add('hidden');
+}
+function closePayment(){ $('payModal').classList.add('hidden'); renderPlans(); renderInvoices(); }
+function switchPayTab(m,btn){
+  state.pay.method=m;
+  document.querySelectorAll('#payTabs button').forEach(b=>{b.className='rounded-xl py-3 text-xs font-bold btn-ghost';});
+  btn.className='rounded-xl py-3 text-xs font-bold border border-neon/50'; btn.style.background='rgba(34,240,200,.1)';
+  ['card','upi','net','wallet'].forEach(f=>$('form-'+f).classList.add('hidden')); $('form-'+m).classList.remove('hidden');
+}
+function calcSummary(){
+  const p=PLANS[state.pay.plan]; const amt=state.pay.billing==='Monthly'?p.m:p.y;
+  const gst=Math.round(amt*0.18); const tot=amt+gst;
+  $('sumPlan').innerText=`${state.pay.plan} • ${state.pay.billing}`; $('sumGst').innerText='₹'+gst.toLocaleString('en-IN');
+  $('sumTotal').innerText='₹'+tot.toLocaleString('en-IN'); $('payBtnAmt').innerText='₹'+tot.toLocaleString('en-IN'); $('upiAmt').innerText='₹'+tot.toLocaleString('en-IN');
+  return tot;
+}
+function ccFmt(el){ let v=el.value.replace(/\D/g,'').slice(0,16); el.value=v.replace(/(.{4})/g,'$1 ').trim(); $('ccPreview').innerText=(el.value||'•••• •••• •••• ••••').padEnd(19,'•'); }
+function expFmt(el){ let v=el.value.replace(/\D/g,'').slice(0,4); el.value=v.length>2?v.slice(0,2)+'/'+v.slice(2):v; $('ccExpPrev').innerText=el.value||'MM/YY'; }
+function processPayment(){
+  const tot=calcSummary();
+  if(state.pay.method==='card'){ if($('ccNum').value.replace(/\s/g,'').length<16){ toast('Enter a valid 16-digit card number.','err'); return; } if($('ccExp').value.length<5){ toast('Enter card expiry (MM/YY).','err'); return; } if($('ccCvv').value.length<3){ toast('Enter 3-digit CVV.','err'); return; } }
+  if(state.pay.method==='upi'&&!$('upiId').value.includes('@')){ toast('Enter a valid UPI ID (name@bank).','err'); return; }
+  $('payActionRow').classList.add('hidden'); $('payProcessing').classList.remove('hidden');
+  const steps=['Contacting bank…','Verifying OTP-less mandate…','Confirming with RBI switch…','Settling amount…','Generating invoice…'];
+  let p=0,i=0; $('procBar').style.width='8%';
+  const iv=setInterval(()=>{ p+=Math.random()*22; i=Math.min(steps.length-1,Math.floor(p/22)); $('procTxt').innerText=steps[i]; $('procBar').style.width=Math.min(100,p)+'%';
+    if(p>=100){ clearInterval(iv); setTimeout(()=>paymentSuccess(tot),600); } },500);
+}
+function paymentSuccess(tot){
+  $('payProcessing').classList.add('hidden'); $('paySuccess').classList.remove('hidden');
+  const tx='TXN'+Date.now().toString().slice(-8); const inv='INV-2026-'+Math.floor(1000+Math.random()*9000);
+  const mlabel={card:'Card •••• '+($('ccNum').value.slice(-4)||'0000'),upi:'UPI '+($('upiId').value||'user@okhdfc'),net:$('bankSel').value,wallet:'Wallet'}[state.pay.method];
+  state.plan.current=state.pay.plan;
+  state.invoices.unshift({inv,plan:state.pay.plan+' • '+state.pay.billing,amt:tot,method:mlabel,status:'PAID',date:new Date().toLocaleDateString('en-IN',{day:'numeric',month:'short'})+' '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})});
+  state.pay.lastTx={tx,inv,tot};
+  $('successTxt').innerHTML=`${inv} • ${tx} • <b class="text-neon">₹${tot.toLocaleString('en-IN')}</b> via ${mlabel}`;
+  renderPlans(); renderInvoices(); confettiBurst();
+  pushCard('💳 Payment received',`${state.pay.plan} activated. Invoice ${inv} for ₹${tot.toLocaleString('en-IN')}.`,'sys');
+  addNotifLog('email','Payment receipt',`Invoice ${inv}: ${state.pay.plan} ${state.pay.billing} — ₹${tot} paid via ${mlabel}.`);
+}
+function renderInvoices(){
+  $('invoiceBody').innerHTML=state.invoices.map(v=>`<tr class="border-t border-white/5 text-xs"><td class="px-5 py-3 tick font-bold text-neon">${v.inv}</td><td class="px-5 py-3">${v.plan}</td><td class="px-5 py-3 tick font-bold">₹${v.amt.toLocaleString('en-IN')}</td><td class="px-5 py-3 text-slate-400">${v.method}</td><td class="px-5 py-3"><span class="chip !text-[9px]" style="background:rgba(34,240,200,.15);color:#6ffbe0">● ${v.status}</span></td><td class="px-5 py-3 tick text-slate-400">${v.date}</td></tr>`).join('');
+  $('noInvoice').style.display=state.invoices.length?'none':'block';
+}
+function downloadReceipt(){
+  const t=state.pay.lastTx; if(!t) return;
+  const txt=`VOLTEDGE RECEIPT\n${t.inv} | ${t.tx}\nPlan: ${state.pay.plan} ${state.pay.billing}\nAmount: Rs.${t.tot}\nDate: ${new Date().toLocaleString()}\nThank you!`;
+  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([txt],{type:'text/plain'})); a.download=t.inv+'.txt'; a.click();
+}
+function confettiBurst(){
+  for(let i=0;i<80;i++){ const d=document.createElement('div'); d.className='confetti'; d.style.cssText=`left:${45+Math.random()*10}vw;top:30vh;width:${6+Math.random()*6}px;height:${8+Math.random()*8}px;background:${['#22f0c8','#38e1ff','#ffb547','#8b7cff','#ff6b9d'][i%5]};border-radius:2px;`;
+    document.body.appendChild(d); const x=(Math.random()-0.5)*600, y=Math.random()*500+100, r=Math.random()*720;
+    d.animate([{transform:'translate(0,0) rotate(0)',opacity:1},{transform:`translate(${x}px,${y}px) rotate(${r}deg)`,opacity:0}],{duration:1600+Math.random()*800,easing:'cubic-bezier(.2,.8,.2,1)'}).onfinish=()=>d.remove(); }
+}
+function renderAll(){ renderLearning(); renderKPIs(); renderAlerts(); renderPlans(); renderInvoices(); updateConnUI(); addNotifLog('sys','System ready','Dashboard loaded. Historical + live data streaming.'); }
+</script>
+</body>
+</html>
